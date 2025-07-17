@@ -7,9 +7,10 @@ const Users = db.define(
   "users",
   {
     id: {
-      type: Sequelize.UUID,
+      type: Sequelize.INTEGER,
       primaryKey: true,
-      defaultValue: Sequelize.UUIDV4,
+      autoIncrement: true,
+      allowNull: false,
     },
     email: {
       type: Sequelize.STRING,

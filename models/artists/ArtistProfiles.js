@@ -6,7 +6,7 @@ const ArtistProfiles = db.define(
   "artistProfiles",
   {
     userId: {
-      type: Sequelize.UUID,
+      type: Sequelize.INTEGER,
       primaryKey: true,
       allowNull: false,
       validate: {

@@ -3,7 +3,7 @@ const db = require("../../server");
 
 const TOSAgreement = db.define("tosAgreements", {
     userId: {
-        type: Sequelize.UUID,
+        type: Sequelize.INTEGER,
         primaryKey: true,
         allowNull: false
     },

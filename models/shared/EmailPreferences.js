@@ -3,7 +3,7 @@ const db = require("../../server");
 
 const EmailPreference = db.define("emailPreferences", {
     userId: {
-      type: Sequelize.UUID,
+      type: Sequelize.INTEGER,
       primaryKey: true,
       allowNull: false,
     },
