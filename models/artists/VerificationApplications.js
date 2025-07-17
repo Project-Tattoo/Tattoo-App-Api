@@ -23,6 +23,7 @@ const VerificationApplications = db.define(
         model: ArtistProfiles,
         key: "userId",
       },
+      onDelete: 'CASCADE'
     },
     submittedAt: {
       type: Sequelize.DATEONLY,

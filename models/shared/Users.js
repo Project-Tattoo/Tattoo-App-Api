@@ -16,28 +16,48 @@ const Users = db.define(
       type: Sequelize.STRING,
       allowNull: false,
       unique: true,
+      validate: {
+        isEmail: { msg: "Must be a valid email address." },
+        notNull: { msg: "Email is required." },
+      },
     },
     passwordHash: {
       type: Sequelize.STRING,
-      required: true,
       allowNull: false,
+      validate: {
+        notNull: { msg: "Password is required." },
+        len: {
+          args: [8, 255],
+          msg: "Password must be at least 8 characters long.",
+        },
+      },
     },
     passwordChangedAt: Sequelize.DATE,
     passwordResetToken: Sequelize.STRING,
     passwordResetExpires: Sequelize.DATE,
     role: {
       type: Sequelize.ENUM("artist", "client", "admin"),
-      required: true,
       allowNull: false,
+      validate: {
+        notNull: { msg: "User role is required." },
+        isIn: {
+          args: [["artist", "client", "admin"]],
+          msg: "Invalid user role. Must be 'artist', 'client', or 'admin'.",
+        },
+      },
     },
     isActive: {
       type: Sequelize.BOOLEAN,
       defaultValue: false,
+      allowNull: false,
     },
     verifiedEmail: {
       type: Sequelize.BOOLEAN,
       defaultValue: false,
+      allowNull: false,
     },
+    verifyToken: Sequelize.STRING,
+    verifyExpires: Sequelize.DATE,
   },
   {
     timestamps: true,
@@ -45,6 +65,7 @@ const Users = db.define(
       beforeSave: async (user) => {
         if (user.changed("passwordHash")) {
           user.passwordHash = await bcrypt.hash(user.passwordHash, 12);
+          user.passwordChangedAt = new Date(Date.now() - 1000);
         }
       },
     },
@@ -59,7 +80,7 @@ Users.prototype.correctPassword = async function (
 };
 
 Users.prototype.changedPasswordAfter = function (JWTTimestamp) {
-  if (this.passwordChangedAt === null) return false;
+  if (!this.passwordChangedAt) return false;
   const changedTimestamp = parseInt(
     this.passwordChangedAt.getTime() / 1000,
     10

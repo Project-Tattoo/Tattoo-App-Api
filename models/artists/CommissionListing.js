@@ -2,8 +2,8 @@ const Sequelize = require("sequelize");
 const db = require("./../../server");
 const ArtistProfiles = require("./ArtistProfiles");
 
-const TattooDesigns = db.define(
-  "tattooDesigns",
+const CommissionListing = db.define(
+  "commissionListings",
   {
     id: {
       type: Sequelize.INTEGER,
@@ -48,53 +48,54 @@ const TattooDesigns = db.define(
         },
       },
     },
-    imageUrl: {
-      type: Sequelize.TEXT,
-      allowNull: false,
-      validate: {
-        notNull: {
-          msg: "A design must have an image",
-        },
-        isUrl: { msg: "Image URL must be a valid URL." },
-      },
-    },
-    thumbnailUrl: {
-      type: Sequelize.TEXT,
-      allowNull: false,
-      validate: {
-        notNull: {
-          msg: "A design must have a thumbnail image",
-        },
-        isUrl: { msg: "Thumbnail URL must be a valid URL." },
-      },
-    },
-    tags: {
-      type: Sequelize.ARRAY(Sequelize.TEXT),
-      allowNull: false,
-      defaultValue: [],
-      validate: {
-        isStringArray(value) {
-          if (!Array.isArray(value)) {
-            throw new Error("Tags must be an array.");
-          }
-          for (const item of value) {
-            if (typeof item !== "string" || item.trim().length === 0) {
-              throw new Error("All tags must be non-empty strings.");
-            }
-          }
-        },
-        maxTags: {
-          args: [20],
-          msg: "Cannot add more than 20 tags.",
-        },
-      },
-    },
-    style: {
+    image: {
       type: Sequelize.TEXT,
       allowNull: true,
+      defaultValue: "www.defaultcommissionimage.com",
+      validate: {
+        isUrl: { msg: "Image must be a valid URL." },
+      },
+    },
+    basePrice: {
+      type: Sequelize.DECIMAL(10, 2),
+      allowNull: false,
+      validate: {
+        notNull: {
+          msg: "A commission must have a price",
+        },
+        isDecimal: true,
+        min: 0.01,
+      },
+    },
+    estimatedTimeToCompletion: {
+      type: Sequelize.INTEGER,
+      allowNull: false,
+      validate: {
+        notNull: {
+          msg: "Must provide a timeframe for completion",
+        },
+        min: 1,
+        isInt: true,
+      },
+    },
+    slotsAvailable: {
+      type: Sequelize.INTEGER,
+      allowNull: false,
+      validate: {
+        notNull: {
+          msg: "Must provide a number of slots, if no longer accepting at this time, please set to zero or turn off commissions",
+        },
+        min: 0,
+        isInt: true
+      },
+    },
+    isActive: {
+      type: Sequelize.BOOLEAN,
+      defaultValue: true,
+      allowNull: false,
     },
   },
   { timestamps: true }
 );
 
-module.exports = TattooDesigns;
+module.exports = CommissionListing;
