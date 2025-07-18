@@ -1,4 +1,4 @@
-const Sequelize = require("sequelize");
+const { DataTypes } = require("sequelize");
 const db = require("./../../server");
 const ArtistProfiles = require("./ArtistProfiles");
 
@@ -6,13 +6,13 @@ const CommissionListing = db.define(
   "commissionListings",
   {
     id: {
-      type: Sequelize.INTEGER,
+      type: DataTypes.UUID,
       primaryKey: true,
-      autoIncrement: true,
+      defaultValue: DataTypes.UUIDV4,
       allowNull: false,
     },
     artistId: {
-      type: Sequelize.INTEGER,
+      type: DataTypes.INTEGER,
       allowNull: false,
       validate: {
         notNull: {
@@ -26,7 +26,7 @@ const CommissionListing = db.define(
       onDelete: "CASCADE",
     },
     title: {
-      type: Sequelize.TEXT,
+      type: DataTypes.TEXT,
       allowNull: false,
       validate: {
         notNull: {
@@ -39,7 +39,7 @@ const CommissionListing = db.define(
       },
     },
     description: {
-      type: Sequelize.TEXT,
+      type: DataTypes.TEXT,
       allowNull: true,
       validate: {
         len: {
@@ -49,7 +49,7 @@ const CommissionListing = db.define(
       },
     },
     image: {
-      type: Sequelize.TEXT,
+      type: DataTypes.TEXT,
       allowNull: true,
       defaultValue: "www.defaultcommissionimage.com",
       validate: {
@@ -57,7 +57,7 @@ const CommissionListing = db.define(
       },
     },
     basePrice: {
-      type: Sequelize.DECIMAL(10, 2),
+      type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
       validate: {
         notNull: {
@@ -68,7 +68,7 @@ const CommissionListing = db.define(
       },
     },
     estimatedTimeToCompletion: {
-      type: Sequelize.INTEGER,
+      type: DataTypes.INTEGER,
       allowNull: false,
       validate: {
         notNull: {
@@ -79,7 +79,7 @@ const CommissionListing = db.define(
       },
     },
     slotsAvailable: {
-      type: Sequelize.INTEGER,
+      type: DataTypes.INTEGER,
       allowNull: false,
       validate: {
         notNull: {
@@ -90,7 +90,7 @@ const CommissionListing = db.define(
       },
     },
     isActive: {
-      type: Sequelize.BOOLEAN,
+      type: DataTypes.BOOLEAN,
       defaultValue: true,
       allowNull: false,
     },

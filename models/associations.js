@@ -13,13 +13,54 @@ const CommissionListing = require("./artists/CommissionListing");
 const ClientProfiles = require("./clients/ClientProfiles");
 const ClientFavoriteDesigns = require("./clients/ClientFavoriteDesigns");
 const ClientFavoriteArtists = require("./clients/ClientFavoriteArtists");
+const CommissionOrders = require("./shared/CommissionOrders");
+const CommissionReviews = require("./shared/CommissionReviews");
 
 // Shared
 Users.hasOne(EmailPreference, { foreignKey: "userId" });
 EmailPreference.belongsTo(Users, { foreignKey: "userId" });
-
 Users.hasMany(TOSAgreement, { foreignKey: "userId" });
 TOSAgreement.belongsTo(Users, { foreignKey: "userId" });
+
+CommissionListing.hasMany(CommissionOrders, {
+  foreignKey: "listingId",
+  sourceKey: "id",
+  onDelete: "SET NULL", 
+  allowNull: true 
+});
+
+ArtistProfiles.hasMany(CommissionOrders, {
+  foreignKey: "artistId",
+  sourceKey: "userId",
+  onDelete: "SET NULL",
+});
+
+CommissionOrders.belongsTo(ArtistProfiles, { foreignKey: "artistId", targetKey: "userId" });
+
+CommissionOrders.belongsTo(CommissionListing, { foreignKey: "listingId", targetKey: "id" });
+
+ArtistProfiles.hasMany(CommissionReviews, {
+  foreignKey: "artistId",
+  sourceKey: "userId",
+  onDelete: "CASCADE",
+  as: "commissionReviewsGiven",
+});
+
+CommissionReviews.belongsTo(ArtistProfiles, {
+  foreignKey: "artistId",
+  targetKey: "userId",
+});
+
+ClientProfiles.hasMany(CommissionReviews, {
+  foreignKey: "clientId",
+  sourceKey: "userId",
+  onDelete: "SET NULL",
+  as: "commissionReviewsWritten",
+});
+CommissionReviews.belongsTo(ClientProfiles, {
+  foreignKey: "clientId",
+  targetKey: "userId",
+});
 
 // Artists
 ArtistProfiles.belongsTo(Users, { foreignKey: "userId" });
@@ -90,4 +131,8 @@ module.exports = {
   CollectionDesigns,
   CommissionListing,
   ClientProfiles,
+  ClientFavoriteDesigns,
+  ClientFavoriteArtists,
+  CommissionOrders,
+  CommissionReviews
 };
