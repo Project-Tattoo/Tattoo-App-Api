@@ -10,6 +10,9 @@ const TattooDesigns = require("./artists/TattooDesigns");
 const Collections = require("./artists/Collections");
 const CollectionDesigns = require("./artists/CollectionDesigns");
 const CommissionListing = require("./artists/CommissionListing");
+const ClientProfiles = require("./clients/ClientProfiles");
+const ClientFavoriteDesigns = require("./clients/ClientFavoriteDesigns");
+const ClientFavoriteArtists = require("./clients/ClientFavoriteArtists");
 
 // Shared
 Users.hasOne(EmailPreference, { foreignKey: "userId" });
@@ -45,6 +48,36 @@ TattooDesigns.belongsToMany(Collections, {
 ArtistProfiles.hasMany(CommissionListing, { foreignKey: "artistId" });
 CommissionListing.belongsTo(ArtistProfiles, { foreignKey: "artistId" });
 
+// Clients
+ClientProfiles.belongsTo(Users, { foreignKey: "userId" });
+Users.hasOne(ClientProfiles, { foreignKey: "userId" });
+
+ClientProfiles.belongsToMany(TattooDesigns, {
+  through: ClientFavoriteDesigns,
+  foreignKey: "clientId",
+  otherKey: "designId",
+  as: "favoriteDesigns",
+});
+TattooDesigns.belongsToMany(ClientProfiles, {
+  through: ClientFavoriteDesigns,
+  foreignKey: "designId",
+  other: "clientId",
+  as: "favoritedByClientsForDesigns",
+});
+
+ClientProfiles.belongsToMany(ArtistProfiles, {
+  through: ClientFavoriteArtists,
+  foreignKey: "clientId",
+  otherKey: "artistId",
+  as: "favoriteArtists",
+});
+ArtistProfiles.belongsToMany(ClientProfiles, {
+  through: ClientFavoriteArtists,
+  foreignKey: "artistId",
+  other: "clientId",
+  as: "favoritedByClientsForArtists",
+});
+
 module.exports = {
   db,
   Users,
@@ -56,4 +89,5 @@ module.exports = {
   Collections,
   CollectionDesigns,
   CommissionListing,
+  ClientProfiles,
 };
