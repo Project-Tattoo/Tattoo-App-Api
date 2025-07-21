@@ -23,7 +23,7 @@ const CommissionOrders = db.define(
       onDelete: "SET NULL",
     },
     artistId: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.BIGINT,
       allowNull: true,
       references: {
         model: ArtistProfiles,
@@ -32,7 +32,7 @@ const CommissionOrders = db.define(
       onDelete: "SET NULL",
     },
     clientId: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.BIGINT,
       allowNull: true,
       references: {
         model: ClientProfiles,

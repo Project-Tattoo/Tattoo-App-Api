@@ -1,14 +1,13 @@
 const { DataTypes } = require("sequelize");
-import { define } from "./../../server";
-import ClientProfiles from "./ClientProfiles";
-import TattooDesigns from "./../artists/TattooDesigns";
-import { Client } from "pg";
+const db = require("./../../server");
+const ClientProfiles = require("./ClientProfiles")
+const TattooDesigns = require("./../artists/TattooDesigns")
 
-const ClientFavoriteDesigns = define(
+const ClientFavoriteDesigns = db.define(
   "clientFavoriteDesigns",
   {
     clientId: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.BIGINT,
       primaryKey: true,
       allowNull: false,
       validate: {
@@ -23,7 +22,7 @@ const ClientFavoriteDesigns = define(
       onDelete: "CASCADE",
     },
     designId: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.BIGINT,
       primaryKey: true,
       allowNull: false,
       validate: {

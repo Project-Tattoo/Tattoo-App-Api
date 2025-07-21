@@ -6,7 +6,7 @@ const TOSAgreement = db.define(
   "tosAgreements",
   {
     userId: {
-      type: Sequelize.INTEGER,
+      type: Sequelize.BIGINT,
       primaryKey: true,
       allowNull: false,
       validate: {

@@ -7,9 +7,15 @@ const Users = db.define(
   "users",
   {
     id: {
-      type: Sequelize.INTEGER,
+      type: Sequelize.BIGINT,
       primaryKey: true,
       autoIncrement: true,
+      allowNull: false,
+    },
+    publicId: { 
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4, 
+      unique: true,
       allowNull: false,
     },
     email: {

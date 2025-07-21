@@ -7,7 +7,7 @@ const ClientFavoriteArtists = define(
   "clientFavoriteArtists",
   {
     clientId: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.BIGINT,
       primaryKey: true,
       allowNull: false,
       validate: {
@@ -22,7 +22,7 @@ const ClientFavoriteArtists = define(
       onDelete: "CASCADE",
     },
     artistId: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.BIGINT,
       primaryKey: true,
       allowNull: false,
       validate: {

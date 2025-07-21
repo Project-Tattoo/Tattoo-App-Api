@@ -7,7 +7,7 @@ const CollectionDesigns = db.define(
   "collectionDesigns",
   {
     collectionId: {
-      type: Sequelize.INTEGER,
+      type: Sequelize.BIGINT,
       primaryKey: true,
       allowNull: false,
       validate: {
@@ -22,7 +22,7 @@ const CollectionDesigns = db.define(
       onDelete: "CASCADE",
     },
     designId: {
-      type: Sequelize.INTEGER,
+      type: Sequelize.BIGINT,
       primaryKey: true,
       allowNull: false,
       validate: {

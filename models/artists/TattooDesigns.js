@@ -6,13 +6,19 @@ const TattooDesigns = db.define(
   "tattooDesigns",
   {
     id: {
-      type: Sequelize.INTEGER,
+      type: Sequelize.BIGINT,
       primaryKey: true,
       autoIncrement: true,
       allowNull: false,
     },
+    publicId: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      unique: true,
+      allowNull: false,
+    },
     artistId: {
-      type: Sequelize.INTEGER,
+      type: Sequelize.BIGINT,
       allowNull: false,
       validate: {
         notNull: {
@@ -90,8 +96,17 @@ const TattooDesigns = db.define(
       },
     },
     style: {
-      type: Sequelize.TEXT,
-      allowNull: true,
+      type: DataTypes.STRING, 
+      allowNull: false, 
+      validate: {
+        notNull: { msg: "Design style is required." },
+        notEmpty: { msg: "Design style cannot be empty." },
+        len: {
+          
+          args: [2, 50], 
+          msg: "Style name must be between 2 and 50 characters.",
+        },
+      },
     },
   },
   { timestamps: true }

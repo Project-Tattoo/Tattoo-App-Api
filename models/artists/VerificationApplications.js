@@ -6,13 +6,13 @@ const VerificationApplications = db.define(
   "verificationApplications",
   {
     id: {
-      type: Sequelize.INTEGER,
+      type: Sequelize.BIGINT,
       primaryKey: true,
       autoIncrement: true,
       allowNull: false,
     },
     artistId: {
-      type: Sequelize.INTEGER,
+      type: Sequelize.BIGINT,
       allowNull: false,
       validate: {
         notNull: {

@@ -1,12 +1,13 @@
 const Sequelize = require("sequelize");
 const db = require("./../../server");
 const Users = require("./../shared/Users");
+const VerificationApplications = require("./VerificationApplications");
 
 const ArtistProfiles = db.define(
   "artistProfiles",
   {
     userId: {
-      type: Sequelize.INTEGER,
+      type: Sequelize.BIGINT,
       primaryKey: true,
       allowNull: false,
       validate: {
@@ -19,6 +20,12 @@ const ArtistProfiles = db.define(
         key: "id",
       },
       onDelete: "CASCADE",
+    },
+    publicId: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      unique: true,
+      allowNull: false,
     },
     displayName: {
       type: Sequelize.TEXT,
@@ -55,6 +62,27 @@ const ArtistProfiles = db.define(
         isIn: {
           args: [["open", "closed", "byRequest"]],
           msg: "Invalid commission status. Must be 'open', 'closed', or 'byRequest'.",
+        },
+      },
+    },
+    stylesOffered: {
+      type: DataTypes.ARRAY(DataTypes.TEXT),
+      allowNull: false,
+      defaultValue: [],
+      validate: {
+        isStringArray(value) {
+          if (!Array.isArray(value)) {
+            throw new Error("Styles offered must be an array.");
+          }
+          for (const item of value) {
+            if (typeof item !== "string" || item.trim().length === 0) {
+              throw new Error("All styles must be non-empty strings.");
+            }
+          }
+        },
+        maxItems: {
+          args: [15],
+          msg: "Cannot list more than 15 styles.",
         },
       },
     },
@@ -156,7 +184,8 @@ const ArtistProfiles = db.define(
               "WY",
             ],
           ],
-        msg: "Invalid state"},
+          msg: "Invalid state",
+        },
       },
     },
     zipcode: {
@@ -194,9 +223,14 @@ const ArtistProfiles = db.define(
       defaultValue: false,
       allowNull: false,
     },
-    // currentVerificationApplicationId: {
-    // compelte later, once model is compelte
-    // },
+    currentVerificationApplicationId: {
+      type: Sequelize.BIGINT,
+      allowNull: true,
+      references: {
+        model: VerificationApplications,
+        key: "id",
+      },
+    },
     totalCommissionsCompleted: {
       type: Sequelize.INTEGER,
       defaultValue: 0,

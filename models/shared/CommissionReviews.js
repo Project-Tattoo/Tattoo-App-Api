@@ -27,7 +27,7 @@ const CommissionReviews = db.define(
       onDelete: "CASCADE", 
     },
     artistId: { 
-      type: DataTypes.INTEGER, 
+      type: DataTypes.BIGINT, 
       allowNull: false,
       validate: {
         notNull: { msg: "Review must be linked to an artist." },
@@ -39,7 +39,7 @@ const CommissionReviews = db.define(
       onDelete: "CASCADE", 
     },
     clientId: { 
-      type: DataTypes.INTEGER,
+      type: DataTypes.BIGINT,
       allowNull: false,
       validate: {
         notNull: { msg: "Review must be linked to a client." },

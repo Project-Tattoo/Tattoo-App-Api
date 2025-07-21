@@ -6,7 +6,7 @@ const EmailPreference = db.define(
   "emailPreferences",
   {
     userId: {
-      type: Sequelize.INTEGER,
+      type: Sequelize.BIGINT,
       primaryKey: true,
       allowNull: false,
       validate: {

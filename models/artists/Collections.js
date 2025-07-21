@@ -6,13 +6,19 @@ const Collections = db.define(
   "collections",
   {
     id: {
-      type: Sequelize.INTEGER,
+      type: Sequelize.BIGINT,
       primaryKey: true,
       autoIncrement: true,
       allowNull: false,
     },
+    publicId: { 
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4, 
+      unique: true, 
+      allowNull: false,
+    },
     artistId: {
-      type: Sequelize.INTEGER,
+      type: Sequelize.BIGINT,
       allowNull: false,
       validate: {
         notNull: {

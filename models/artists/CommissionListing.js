@@ -12,7 +12,7 @@ const CommissionListing = db.define(
       allowNull: false,
     },
     artistId: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.BIGINT,
       allowNull: false,
       validate: {
         notNull: {
@@ -24,6 +24,12 @@ const CommissionListing = db.define(
         key: "userId",
       },
       onDelete: "CASCADE",
+    },
+    publicId: { 
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4, 
+      unique: true, 
+      allowNull: false,
     },
     title: {
       type: DataTypes.TEXT,
