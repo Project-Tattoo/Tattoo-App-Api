@@ -1,4 +1,4 @@
-const Sequelize = require("sequelize");
+const { DataTypes } = require("sequelize");
 const db = require("../../server");
 const Users = require("./Users");
 
@@ -6,7 +6,7 @@ const EmailPreference = db.define(
   "emailPreferences",
   {
     userId: {
-      type: Sequelize.BIGINT,
+      type: DataTypes.BIGINT,
       primaryKey: true,
       allowNull: false,
       validate: {
@@ -21,12 +21,12 @@ const EmailPreference = db.define(
       onDelete: "CASCADE",
     },
     marketingEmailsEnabled: {
-      type: Sequelize.BOOLEAN,
+      type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: true,
     },
     notificationEmailsEnabled: {
-      type: Sequelize.BOOLEAN,
+      type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: true,
     },

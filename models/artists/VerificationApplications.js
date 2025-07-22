@@ -1,4 +1,4 @@
-const Sequelize = require("sequelize");
+const { DataTypes } = require("sequelize");
 const db = require("./../../server");
 const ArtistProfiles = require("./ArtistProfiles");
 
@@ -6,13 +6,13 @@ const VerificationApplications = db.define(
   "verificationApplications",
   {
     id: {
-      type: Sequelize.BIGINT,
+      type: DataTypes.BIGINT,
       primaryKey: true,
       autoIncrement: true,
       allowNull: false,
     },
     artistId: {
-      type: Sequelize.BIGINT,
+      type: DataTypes.BIGINT,
       allowNull: false,
       validate: {
         notNull: {
@@ -26,24 +26,24 @@ const VerificationApplications = db.define(
       onDelete: 'CASCADE'
     },
     submittedAt: {
-      type: Sequelize.DATEONLY,
+      type: DataTypes.DATEONLY,
       allowNull: false,
     },
     status: {
-      type: Sequelize.ENUM("Pending", "Approved", "Rejected", "Cancelled"),
+      type: DataTypes.ENUM("Pending", "Approved", "Rejected", "Cancelled"),
       allowNull: false,
     },
     reviewNotes: {
-      type: Sequelize.TEXT,
+      type: DataTypes.TEXT,
     },
     rejectionReason: {
-      type: Sequelize.TEXT,
+      type: DataTypes.TEXT,
     },
     supportingDocumentsUrl: {
-      type: Sequelize.JSONB,
+      type: DataTypes.JSONB,
     },
     reviewedAt: {
-      type: Sequelize.DATEONLY,
+      type: DataTypes.DATEONLY,
     },
   },
   { timestamps: true }

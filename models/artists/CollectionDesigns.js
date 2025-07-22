@@ -1,4 +1,4 @@
-const Sequelize = require("sequelize");
+const { DataTypes } = require("sequelize");
 const db = require("./../../server");
 const Collections = require("./Collections");
 const TattooDesigns = require("./TattooDesigns");
@@ -7,7 +7,7 @@ const CollectionDesigns = db.define(
   "collectionDesigns",
   {
     collectionId: {
-      type: Sequelize.BIGINT,
+      type: DataTypes.BIGINT,
       primaryKey: true,
       allowNull: false,
       validate: {
@@ -22,7 +22,7 @@ const CollectionDesigns = db.define(
       onDelete: "CASCADE",
     },
     designId: {
-      type: Sequelize.BIGINT,
+      type: DataTypes.BIGINT,
       primaryKey: true,
       allowNull: false,
       validate: {

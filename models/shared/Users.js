@@ -1,4 +1,4 @@
-const Sequelize = require("sequelize");
+const { DataTypes } = require("sequelize");
 const db = require("./../../server");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
@@ -7,7 +7,7 @@ const Users = db.define(
   "users",
   {
     id: {
-      type: Sequelize.BIGINT,
+      type: DataTypes.BIGINT,
       primaryKey: true,
       autoIncrement: true,
       allowNull: false,
@@ -19,7 +19,7 @@ const Users = db.define(
       allowNull: false,
     },
     email: {
-      type: Sequelize.STRING,
+      type: DataTypes.STRING,
       allowNull: false,
       unique: true,
       validate: {
@@ -28,7 +28,7 @@ const Users = db.define(
       },
     },
     passwordHash: {
-      type: Sequelize.STRING,
+      type: DataTypes.STRING,
       allowNull: false,
       validate: {
         notNull: { msg: "Password is required." },
@@ -38,11 +38,11 @@ const Users = db.define(
         },
       },
     },
-    passwordChangedAt: Sequelize.DATE,
-    passwordResetToken: Sequelize.STRING,
-    passwordResetExpires: Sequelize.DATE,
+    passwordChangedAt: DataTypes.DATE,
+    passwordResetToken: DataTypes.STRING,
+    passwordResetExpires: DataTypes.DATE,
     role: {
-      type: Sequelize.ENUM("artist", "client", "admin"),
+      type: DataTypes.ENUM("artist", "client", "admin"),
       allowNull: false,
       validate: {
         notNull: { msg: "User role is required." },
@@ -53,17 +53,17 @@ const Users = db.define(
       },
     },
     isActive: {
-      type: Sequelize.BOOLEAN,
+      type: DataTypes.BOOLEAN,
       defaultValue: false,
       allowNull: false,
     },
     verifiedEmail: {
-      type: Sequelize.BOOLEAN,
+      type: DataTypes.BOOLEAN,
       defaultValue: false,
       allowNull: false,
     },
-    verifyToken: Sequelize.STRING,
-    verifyExpires: Sequelize.DATE,
+    verifyToken: DataTypes.STRING,
+    verifyExpires: DataTypes.DATE,
   },
   {
     timestamps: true,

@@ -1,4 +1,4 @@
-const Sequelize = require("sequelize");
+const { DataTypes } = require("sequelize");
 const db = require("./../../server");
 const Users = require("./../shared/Users");
 
@@ -6,7 +6,7 @@ const ClientProfiles = db.define(
   "clientProfiles",
   {
     userId: {
-      type: Sequelize.BIGINT,
+      type: DataTypes.BIGINT,
       primaryKey: true,
       allowNull: false,
       validate: {
@@ -27,7 +27,7 @@ const ClientProfiles = db.define(
       allowNull: false,
     },
     displayName: {
-      type: Sequelize.TEXT,
+      type: DataTypes.TEXT,
       allowNull: false,
       unique: true,
       validate: {
@@ -41,7 +41,7 @@ const ClientProfiles = db.define(
       },
     },
     bio: {
-      type: Sequelize.TEXT,
+      type: DataTypes.TEXT,
       allowNull: true,
       validate: {
         len: {

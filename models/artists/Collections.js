@@ -1,4 +1,4 @@
-const Sequelize = require("sequelize");
+const { DataTypes } = require("sequelize");
 const db = require("./../../server");
 const ArtistProfiles = require("./ArtistProfiles");
 
@@ -6,7 +6,7 @@ const Collections = db.define(
   "collections",
   {
     id: {
-      type: Sequelize.BIGINT,
+      type: DataTypes.BIGINT,
       primaryKey: true,
       autoIncrement: true,
       allowNull: false,
@@ -18,7 +18,7 @@ const Collections = db.define(
       allowNull: false,
     },
     artistId: {
-      type: Sequelize.BIGINT,
+      type: DataTypes.BIGINT,
       allowNull: false,
       validate: {
         notNull: {
@@ -32,7 +32,7 @@ const Collections = db.define(
       onDelete: "CASCADE",
     },
     name: {
-      type: Sequelize.TEXT,
+      type: DataTypes.TEXT,
       allowNull: false,
       validate: {
         notNull: {
@@ -45,7 +45,7 @@ const Collections = db.define(
       },
     },
     description: {
-      type: Sequelize.TEXT,
+      type: DataTypes.TEXT,
       allowNull: true,
       validate: {
         len: {

@@ -1,4 +1,4 @@
-const Sequelize = require("sequelize");
+const { DataTypes } = require("sequelize");
 const db = require("./../../server");
 const ArtistProfiles = require("./ArtistProfiles");
 
@@ -6,7 +6,7 @@ const TattooDesigns = db.define(
   "tattooDesigns",
   {
     id: {
-      type: Sequelize.BIGINT,
+      type: DataTypes.BIGINT,
       primaryKey: true,
       autoIncrement: true,
       allowNull: false,
@@ -18,7 +18,7 @@ const TattooDesigns = db.define(
       allowNull: false,
     },
     artistId: {
-      type: Sequelize.BIGINT,
+      type: DataTypes.BIGINT,
       allowNull: false,
       validate: {
         notNull: {
@@ -32,7 +32,7 @@ const TattooDesigns = db.define(
       onDelete: "CASCADE",
     },
     title: {
-      type: Sequelize.TEXT,
+      type: DataTypes.TEXT,
       allowNull: false,
       validate: {
         notNull: {
@@ -45,7 +45,7 @@ const TattooDesigns = db.define(
       },
     },
     description: {
-      type: Sequelize.TEXT,
+      type: DataTypes.TEXT,
       allowNull: true,
       validate: {
         len: {
@@ -55,7 +55,7 @@ const TattooDesigns = db.define(
       },
     },
     imageUrl: {
-      type: Sequelize.TEXT,
+      type: DataTypes.TEXT,
       allowNull: false,
       validate: {
         notNull: {
@@ -65,7 +65,7 @@ const TattooDesigns = db.define(
       },
     },
     thumbnailUrl: {
-      type: Sequelize.TEXT,
+      type: DataTypes.TEXT,
       allowNull: false,
       validate: {
         notNull: {
@@ -75,7 +75,7 @@ const TattooDesigns = db.define(
       },
     },
     tags: {
-      type: Sequelize.ARRAY(Sequelize.TEXT),
+      type: DataTypes.ARRAY(DataTypes.TEXT),
       allowNull: false,
       defaultValue: [],
       validate: {

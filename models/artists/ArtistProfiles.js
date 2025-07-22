@@ -1,4 +1,4 @@
-const Sequelize = require("sequelize");
+const { DataTypes, Sequelize } = require("sequelize");
 const db = require("./../../server");
 const Users = require("./../shared/Users");
 const VerificationApplications = require("./VerificationApplications");
@@ -7,7 +7,7 @@ const ArtistProfiles = db.define(
   "artistProfiles",
   {
     userId: {
-      type: Sequelize.BIGINT,
+      type: DataTypes.BIGINT,
       primaryKey: true,
       allowNull: false,
       validate: {
@@ -28,7 +28,7 @@ const ArtistProfiles = db.define(
       allowNull: false,
     },
     displayName: {
-      type: Sequelize.TEXT,
+      type: DataTypes.TEXT,
       allowNull: false,
       unique: true,
       validate: {
@@ -42,7 +42,7 @@ const ArtistProfiles = db.define(
       },
     },
     bio: {
-      type: Sequelize.TEXT,
+      type: DataTypes.TEXT,
       allowNull: true,
       validate: {
         len: {
@@ -52,7 +52,7 @@ const ArtistProfiles = db.define(
       },
     },
     commissionStatus: {
-      type: Sequelize.ENUM("open", "closed", "byRequest"),
+      type: DataTypes.ENUM("open", "closed", "byRequest"),
       allowNull: false,
       defaultValue: "closed",
       validate: {
@@ -87,17 +87,17 @@ const ArtistProfiles = db.define(
       },
     },
     paymentPlatformId: {
-      type: Sequelize.TEXT,
+      type: DataTypes.TEXT,
       allowNull: true,
       unique: true,
     },
     socialMediaLinks: {
-      type: Sequelize.JSONB,
+      type: DataTypes.JSONB,
       allowNull: false,
       defaultValue: {},
     },
     profilePictureUrl: {
-      type: Sequelize.TEXT,
+      type: DataTypes.TEXT,
       allowNull: false,
       defaultValue: "www.defaultpfp.com",
       validate: {
@@ -106,7 +106,7 @@ const ArtistProfiles = db.define(
       },
     },
     city: {
-      type: Sequelize.STRING,
+      type: DataTypes.STRING,
       allowNull: false,
       validate: {
         notNull: { msg: "City is required." },
@@ -114,7 +114,7 @@ const ArtistProfiles = db.define(
       },
     },
     state: {
-      type: Sequelize.STRING,
+      type: DataTypes.STRING,
       allowNull: false,
       validate: {
         notNull: { msg: "State is required." },
@@ -189,7 +189,7 @@ const ArtistProfiles = db.define(
       },
     },
     zipcode: {
-      type: Sequelize.STRING,
+      type: DataTypes.STRING,
       allowNull: false,
       validate: {
         notNull: { msg: "Zipcode is required." },
@@ -201,7 +201,7 @@ const ArtistProfiles = db.define(
       },
     },
     location: {
-      type: Sequelize.GEOGRAPHY("POINT"),
+      type: DataTypes.GEOGRAPHY("POINT"),
       allowNull: true,
       get() {
         const value = this.getDataValue("location");
@@ -219,12 +219,12 @@ const ArtistProfiles = db.define(
       },
     },
     isVerified: {
-      type: Sequelize.BOOLEAN,
+      type: DataTypes.BOOLEAN,
       defaultValue: false,
       allowNull: false,
     },
     currentVerificationApplicationId: {
-      type: Sequelize.BIGINT,
+      type: DataTypes.BIGINT,
       allowNull: true,
       references: {
         model: VerificationApplications,
@@ -232,7 +232,7 @@ const ArtistProfiles = db.define(
       },
     },
     totalCommissionsCompleted: {
-      type: Sequelize.INTEGER,
+      type: DataTypes.INTEGER,
       defaultValue: 0,
       allowNull: false,
       validate: {
@@ -241,7 +241,7 @@ const ArtistProfiles = db.define(
       },
     },
     totalRevenueEarned: {
-      type: Sequelize.DECIMAL(10, 2),
+      type: DataTypes.DECIMAL(10, 2),
       defaultValue: 0.0,
       allowNull: false,
       validate: {
@@ -250,7 +250,7 @@ const ArtistProfiles = db.define(
       },
     },
     currencyCode: {
-      type: Sequelize.STRING,
+      type: DataTypes.STRING,
       allowNull: false,
       defaultValue: "USD",
       validate: {
@@ -443,7 +443,7 @@ const ArtistProfiles = db.define(
       },
     },
     averageRating: {
-      type: Sequelize.DECIMAL(2, 1),
+      type: DataTypes.DECIMAL(2, 1),
       defaultValue: 0.0,
       allowNull: false,
       validate: {
