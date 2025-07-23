@@ -44,7 +44,15 @@ const TOSAgreement = db.define(
       },
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    indexes: [
+      { fields: ["userId"], name: "tos_agreements_userid_idx" },
+      { fields: ["tosVersion"], name: "tos_agreements_tos_version_idx" },
+      { fields: ["agreedAt"], name: "tos_agreements_agreed_at_idx" },
+      { fields: ["ipAddress"], name: "tos_agreements_ip_address_idx" },
+    ],
+  }
 );
 
 module.exports = TOSAgreement;

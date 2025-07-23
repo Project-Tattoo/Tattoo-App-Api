@@ -1,7 +1,7 @@
 const { DataTypes } = require("sequelize");
 const db = require("./../../server");
-const ClientProfiles = require("./ClientProfiles")
-const TattooDesigns = require("./../artists/TattooDesigns")
+const ClientProfiles = require("./ClientProfiles");
+const TattooDesigns = require("./../artists/TattooDesigns");
 
 const ClientFavoriteDesigns = db.define(
   "clientFavoriteDesigns",
@@ -46,16 +46,20 @@ const ClientFavoriteDesigns = db.define(
     timestamps: false,
     indexes: [
       {
-        unique: true, 
+        unique: true,
         fields: ["clientId", "designId"],
       },
       {
-        fields: ["clientId"], 
+        fields: ["clientId"],
         name: "idx_client_favorite_designs_by_client_id",
       },
       {
         fields: ["designId"],
         name: "idx_client_favorite_designs_by_design_id",
+      },
+      {
+        fields: ["favoritedAt"],
+        name: "client_favorite_designs_favorited_at_idx",
       },
     ],
   }

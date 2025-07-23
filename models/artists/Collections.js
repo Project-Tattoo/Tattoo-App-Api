@@ -54,8 +54,22 @@ const Collections = db.define(
         },
       },
     },
+    totalViews: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+      allowNull: false,
+      validate: { min: 0, isInt: true }
+    },
   },
-  { timestamps: true }
+  { timestamps: true,
+    indexes: [
+      { unique: true, fields: ['publicId'], name: 'collections_public_id_unique_idx' },
+      { fields: ['artistId'], name: 'collections_artist_id_idx' },
+      { fields: ['name'], name: 'collections_name_idx' },
+      { fields: ['totalViews'], name: 'collections_total_views_idx' },
+      { fields: ['createdAt'], name: 'collections_created_at_idx' },
+    ]
+   }
 );
 
 module.exports = Collections;

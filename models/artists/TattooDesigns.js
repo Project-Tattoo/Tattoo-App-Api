@@ -108,8 +108,41 @@ const TattooDesigns = db.define(
         },
       },
     },
+    searchVector: {
+      type: DataTypes.TSVECTOR,
+      allowNull: true, 
+    },
+    totalViews: { 
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+      allowNull: false,
+      validate: { min: 0, isInt: true } 
+    },
+    totalFavorites: { 
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+      allowNull: false,
+      validate: { min: 0, isInt: true } 
+    },
+    totalShares: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+      allowNull: false,
+      validate: { min: 0, isInt: true }
+    },
   },
-  { timestamps: true }
+  { timestamps: true,
+    indexes: [
+      { unique: true, fields: ['publicId'], name: 'tattoo_designs_public_id_unique_idx' },
+      { fields: ['artistId'], name: 'tattoo_designs_artist_id_idx' },
+      { fields: ['style'], name: 'tattoo_designs_style_idx' },
+      { fields: ['totalViews'], name: 'tattoo_designs_total_views_idx' },
+      { fields: ['totalFavorites'], name: 'tattoo_designs_total_favorites_idx' },
+      { fields: ['totalShares'], name: 'tattoo_designs_total_shares_idx' },
+      { fields: ['createdAt'], name: 'tattoo_designs_created_at_idx' },
+      { fields: ['searchVector'], using: 'GIN', name: 'tattoo_designs_search_vector_idx' },
+    ]
+   }
 );
 
 module.exports = TattooDesigns;

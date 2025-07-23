@@ -50,7 +50,13 @@ const SuggestedStyles = db.define(
       defaultValue: DataTypes.NOW,
     },
   },
-  { timestamps: true }
+  { timestamps: true,
+    indexes: [
+      { fields: ['status'], name: 'suggested_styles_status_idx' },
+      { fields: ['count'], name: 'suggested_styles_count_idx' },
+      { fields: ['lastSubmittedAt'], name: 'suggested_styles_last_submitted_at_idx' },
+    ]
+   }
 );
 
 module.exports = SuggestedStyles;

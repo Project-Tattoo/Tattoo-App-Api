@@ -6,10 +6,10 @@ const CommissionListing = db.define(
   "commissionListings",
   {
     id: {
-      type: DataTypes.UUID,
+      type: DataTypes.BIGINT,
       primaryKey: true,
-      defaultValue: DataTypes.UUIDV4,
       allowNull: false,
+      autoIncrement: true
     },
     artistId: {
       type: DataTypes.BIGINT,
@@ -100,8 +100,35 @@ const CommissionListing = db.define(
       defaultValue: true,
       allowNull: false,
     },
+    searchVector: {
+      type: DataTypes.TSVECTOR,
+      allowNull: true, 
+    },
+    totalViews: { 
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+      allowNull: false,
+      validate: { min: 0, isInt: true } 
+    },
+    totalInquiries: { 
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+      allowNull: false,
+      validate: { min: 0, isInt: true } 
+    },
   },
-  { timestamps: true }
+  { timestamps: true,
+    indexes: [
+      { unique: true, fields: ['publicId'], name: 'commission_listings_public_id_unique_idx' },
+      { fields: ['artistId'], name: 'commission_listings_artist_id_idx' },
+      { fields: ['isActive'], name: 'commission_listings_is_active_idx' },
+      { fields: ['basePrice'], name: 'commission_listings_base_price_idx' },
+      { fields: ['totalViews'], name: 'commission_listings_total_views_idx' },
+      { fields: ['totalInquiries'], name: 'commission_listings_total_inquiries_idx' },
+      { fields: ['createdAt'], name: 'commission_listings_created_at_idx' },
+      { fields: ['searchVector'], using: 'GIN', name: 'commission_listings_search_vector_idx' },
+    ]
+   }
 );
 
 module.exports = CommissionListing;

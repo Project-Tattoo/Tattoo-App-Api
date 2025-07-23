@@ -1,7 +1,7 @@
 const { DataTypes } = require("sequelize");
-import { define } from "./../../server";
-import ClientProfiles from "./ClientProfiles";
-import ArtistProfiles from "./../artists/ArtistProfiles";
+const db = require("./../../server");
+const ClientProfiles = require("./ClientProfiles");
+const ArtistProfiles = require("./../artists/ArtistProfiles");
 
 const ClientFavoriteArtists = define(
   "clientFavoriteArtists",
@@ -37,7 +37,7 @@ const ClientFavoriteArtists = define(
       onDelete: "CASCADE",
     },
     favoritedAt: {
-      type: DataTypes.DATEONLY,
+      type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
     },
@@ -46,16 +46,15 @@ const ClientFavoriteArtists = define(
     timestamps: false,
     indexes: [
       {
-        unique: true, 
+        unique: true,
         fields: ["clientId", "artistId"],
+        name: "unique_client_artist_favorite",
       },
+      { fields: ["clientId"], name: "client_favorite_artists_client_id_idx" },
+      { fields: ["artistId"], name: "client_favorite_artists_artist_id_idx" },
       {
-        fields: ["clientId"], 
-        name: "idx_client_favorite_artists_by_client_id",
-      },
-      {
-        fields: ["artistId"],
-        name: "idx_client_favorite_artists_by_artist_id",
+        fields: ["favoritedAt"],
+        name: "client_favorite_artists_favorited_at_idx",
       },
     ],
   }

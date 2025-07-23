@@ -15,7 +15,7 @@ const CommissionReviews = db.define(
     },
     commissionOrderId: {
       type: DataTypes.UUID,
-      unique: true, 
+      unique: true,
       allowNull: false,
       validate: {
         notNull: { msg: "A review must be linked to a commission order." },
@@ -24,10 +24,10 @@ const CommissionReviews = db.define(
         model: CommissionOrders,
         key: "id",
       },
-      onDelete: "CASCADE", 
+      onDelete: "CASCADE",
     },
-    artistId: { 
-      type: DataTypes.BIGINT, 
+    artistId: {
+      type: DataTypes.BIGINT,
       allowNull: false,
       validate: {
         notNull: { msg: "Review must be linked to an artist." },
@@ -36,9 +36,9 @@ const CommissionReviews = db.define(
         model: ArtistProfiles,
         key: "userId",
       },
-      onDelete: "CASCADE", 
+      onDelete: "CASCADE",
     },
-    clientId: { 
+    clientId: {
       type: DataTypes.BIGINT,
       allowNull: false,
       validate: {
@@ -48,7 +48,7 @@ const CommissionReviews = db.define(
         model: ClientProfiles,
         key: "userId",
       },
-      onDelete: "SET NULL", 
+      onDelete: "SET NULL",
     },
     rating: {
       type: DataTypes.INTEGER,
@@ -64,17 +64,26 @@ const CommissionReviews = db.define(
       type: DataTypes.TEXT,
       allowNull: true,
       validate: {
-        len: { args: [0, 2000], msg: "Review text cannot exceed 2000 characters." }
-      }
+        len: {
+          args: [0, 2000],
+          msg: "Review text cannot exceed 2000 characters.",
+        },
+      },
     },
   },
   {
     timestamps: true,
     indexes: [
-      { fields: ['commissionOrderId'], name: 'idx_commission_reviews_by_order' },
-      { fields: ['artistId'], name: 'idx_commission_reviews_by_artist' }, 
-      { fields: ['clientId'], name: 'idx_commission_reviews_by_client' }  
-    ]
+      {
+        unique: true,
+        fields: ["commissionOrderId"],
+        name: "commission_reviews_order_id_unique_idx",
+      },
+      { fields: ["artistId"], name: "commission_reviews_artist_id_idx" },
+      { fields: ["clientId"], name: "commission_reviews_client_id_idx" },
+      { fields: ["rating"], name: "commission_reviews_rating_idx" },
+      { fields: ["createdAt"], name: "commission_reviews_created_at_idx" },
+    ],
   }
 );
 

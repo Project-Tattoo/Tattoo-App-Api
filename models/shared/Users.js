@@ -12,9 +12,9 @@ const Users = db.define(
       autoIncrement: true,
       allowNull: false,
     },
-    publicId: { 
+    publicId: {
       type: DataTypes.UUID,
-      defaultValue: DataTypes.UUIDV4, 
+      defaultValue: DataTypes.UUIDV4,
       unique: true,
       allowNull: false,
     },
@@ -54,7 +54,7 @@ const Users = db.define(
     },
     isActive: {
       type: DataTypes.BOOLEAN,
-      defaultValue: false,
+      defaultValue: true,
       allowNull: false,
     },
     verifiedEmail: {
@@ -67,6 +67,22 @@ const Users = db.define(
   },
   {
     timestamps: true,
+    indexes: [
+      {
+        unique: true,
+        fields: ["publicId"],
+        name: "users_public_id_unique_idx",
+      },
+      { unique: true, fields: ["email"], name: "users_email_unique_idx" },
+      { fields: ["role"], name: "users_role_idx" },
+      { fields: ["isActive"], name: "users_is_active_idx" },
+      { fields: ["verifiedEmail"], name: "users_verified_email_idx" },
+      {
+        fields: ["passwordResetToken"],
+        name: "users_password_reset_token_idx",
+      },
+      { fields: ["verifyToken"], name: "users_verify_token_idx" },
+    ],
     hooks: {
       beforeSave: async (user) => {
         if (user.changed("passwordHash")) {

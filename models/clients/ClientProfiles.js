@@ -50,8 +50,38 @@ const ClientProfiles = db.define(
         },
       },
     },
+    totalViews: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+      allowNull: false,
+      validate: { min: 0, isInt: true },
+    },
+    lastActivityAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    indexes: [
+      {
+        unique: true,
+        fields: ["publicId"],
+        name: "client_profiles_public_id_unique_idx",
+      },
+      {
+        unique: true,
+        fields: ["displayName"],
+        name: "client_profiles_display_name_unique_idx",
+      },
+      { fields: ["userId"], name: "client_profiles_userid_idx" },
+      { fields: ["totalViews"], name: "client_profiles_total_views_idx" },
+      {
+        fields: ["lastActivityAt"],
+        name: "client_profiles_last_activity_at_idx",
+      },
+    ],
+  }
 );
 
 module.exports = ClientProfiles;

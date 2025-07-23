@@ -31,7 +31,20 @@ const EmailPreference = db.define(
       defaultValue: true,
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    indexes: [
+      { fields: ["userId"], name: "email_preferences_userid_idx" },
+      {
+        fields: ["marketingEmailsEnabled"],
+        name: "email_preferences_marketing_enabled_idx",
+      },
+      {
+        fields: ["notificationEmailsEnabled"],
+        name: "email_preferences_notification_enabled_idx",
+      },
+    ],
+  }
 );
 
 module.exports = EmailPreference;

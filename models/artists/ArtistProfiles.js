@@ -452,6 +452,26 @@ const ArtistProfiles = db.define(
         max: 5.0,
       },
     },
+    searchVector: {
+      type: DataTypes.TSVECTOR,
+      allowNull: true,
+    },
+    totalViews: { 
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+      allowNull: false,
+      validate: { min: 0, isInt: true } 
+    },
+    totalFollowers: { 
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+      allowNull: false,
+      validate: { min: 0, isInt: true } 
+    },
+    lastActivityAt: { 
+      type: DataTypes.DATE,
+      allowNull: true,
+    }
   },
   { timestamps: true }
 );

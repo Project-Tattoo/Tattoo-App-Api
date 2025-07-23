@@ -8,13 +8,13 @@ const CommissionOrders = db.define(
   "commissionOrders",
   {
     id: {
-      type: DataTypes.UUID,
-      defaultValue: DataTypes.UUIDV4,
+      type: DataTypes.BIGINT,
+      autoIncrement: true,
       primaryKey: true,
       allowNull: false,
     },
     listingId: {
-      type: DataTypes.UUID,
+      type: DataTypes.BIGINT,
       allowNull: true,
       references: {
         model: CommissionListings,
@@ -40,6 +40,12 @@ const CommissionOrders = db.define(
       },
       onDelete: "SET NULL",
     },
+    orderId: { 
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4, 
+      unique: true, 
+      allowNull: false,
+    },
     agreedPrice: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
@@ -62,7 +68,7 @@ const CommissionOrders = db.define(
         "disputed"
       ),
       allowNull: false,
-      defaultValue: "pending_artist_acceptance", 
+      defaultValue: "pending_artist_acceptance",
       validate: {
         notNull: { msg: "Commission status is required." },
         isIn: {
@@ -92,23 +98,23 @@ const CommissionOrders = db.define(
         len: {
           args: [10, 5000],
           msg: "Request details must be between 10 and 5000 characters.",
-        }, 
+        },
       },
     },
     artistSubmissionUrl: {
       type: DataTypes.TEXT,
-      allowNull: true, 
+      allowNull: true,
       validate: {
         isUrl: { msg: "Artist submission URL must be a valid URL." },
       },
     },
     artistSubmissionDate: {
-      type: DataTypes.DATE, 
-      allowNull: true, 
+      type: DataTypes.DATE,
+      allowNull: true,
     },
     clientConfirmationDate: {
-      type: DataTypes.DATE, 
-      allowNull: true, 
+      type: DataTypes.DATE,
+      allowNull: true,
     },
     paymentStatus: {
       type: DataTypes.ENUM("pending", "paid", "refunded", "disputed"),
@@ -126,15 +132,13 @@ const CommissionOrders = db.define(
   {
     timestamps: true,
     indexes: [
-      { fields: ["listingId"], name: "idx_commission_orders_by_listing" },
-      { fields: ["artistId"], name: "idx_commission_orders_by_artist" },
-      { fields: ["clientId"], name: "idx_commission_orders_by_client" },
-      { fields: ["status"], name: "idx_commission_orders_by_status" },
-      {
-        fields: ["paymentStatus"],
-        name: "idx_commission_orders_by_payment_status",
-      },
-    ],
+      { fields: ["listingId"], name: "commission_orders_listing_id_idx" },
+      { fields: ["artistId"], name: "commission_orders_artist_id_idx" },
+      { fields: ["clientId"], name: "commission_orders_client_id_idx" },
+      { fields: ["status"], name: "commission_orders_status_idx" },
+      { fields: ["paymentStatus"], name: "commission_orders_payment_status_idx" },
+      { fields: ['createdAt'], name: 'commission_orders_created_at_idx' },
+    ]
   }
 );
 
