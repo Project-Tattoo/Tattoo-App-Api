@@ -12,14 +12,13 @@ process.on("uncaughtException", (err) => {
 
 dotenv.config({ path: "./config.env" });
 
-const envConfig = config[process.env.NODE_ENV || "development"]; // defaults to development
+const envConfig = config[process.env.NODE_ENV || "development"];
 
 if (!envConfig) {
   console.error("Invalid NODE_ENV:", process.env.NODE_ENV);
   process.exit(1);
 }
 
-// Ensure `envConfig` is valid before using its properties
 if (envConfig.database && envConfig.username && envConfig.password) {
   db = new Sequelize(
     envConfig.database,
@@ -30,7 +29,7 @@ if (envConfig.database && envConfig.username && envConfig.password) {
       host: envConfig.host,
       port: 5432,
       charset: "utf8",
-      ssl: process.env.NODE_ENV === "production", // Enable SSL for production
+      ssl: process.env.NODE_ENV === "production", 
       logging: process.env.NODE_ENV === "test" ? false : console.log,
     }
   );

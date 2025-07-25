@@ -26,6 +26,11 @@ const ClientProfiles = db.define(
       unique: true,
       allowNull: false,
     },
+    stripeCustomerId: {
+      type: DataTypes.STRING, 
+      allowNull: true, 
+      unique: true
+    },
     displayName: {
       type: DataTypes.TEXT,
       allowNull: false,
