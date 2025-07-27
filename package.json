@@ -5,8 +5,8 @@
   "main": "index.js",
   "scripts": {
     "docker-test:up": "docker compose -f docker/docker-test-compose.yml up -d",
-    "docker-test:down": "docker compose -f docker/docker-test-compose.yml down",
-    "test": "NODE_ENV=test npm run docker-test:up && npm run wait && jest --forceExit",
+    "docker-test:down": "docker compose -f docker/docker-test-compose.yml down --volumes",
+    "test": "cross-env NODE_ENV=test npm run docker-test:up && cross-env NODE_ENV=test npm run wait && cross-env NODE_ENV=test jest --forceExit",
     "start": "node app.js",
     "dev": "nodemon app.js",
     "docker:up": "docker compose -f docker/docker-compose.yml up -d",
@@ -52,6 +52,7 @@
     "xss-clean": "^0.1.4"
   },
   "devDependencies": {
+    "cross-env": "^10.0.0",
     "jest": "^30.0.4",
     "sequelize-cli": "^6.6.3",
     "sequelize-mock": "^0.10.2",

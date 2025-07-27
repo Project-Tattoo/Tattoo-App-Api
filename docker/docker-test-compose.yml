@@ -10,11 +10,12 @@ services:
     ports:
       - "5433:5432" 
     volumes:
-      - test_pgdata:/var/lib/postgresql/data 
+      - test_pgdata:/var/lib/postgresql/data
   adminer:
     image: adminer
     ports:
       - "8081:8080"
 volumes:
   test_pgdata: 
-    name: test-tattoo-db 
+    name: test-tattoo-db-volume
+    
