@@ -6,15 +6,16 @@
   "scripts": {
     "docker-test:up": "docker compose -f docker/docker-test-compose.yml up -d",
     "docker-test:down": "docker compose -f docker/docker-test-compose.yml down",
-    "test": "NODE_ENV=test npm run docker-test:up && npm run wait && jest",
+    "test": "NODE_ENV=test npm run docker-test:up && npm run wait && jest --forceExit",
     "start": "node app.js",
     "dev": "nodemon app.js",
     "docker:up": "docker compose -f docker/docker-compose.yml up -d",
-    "docker:down": "docker compose -f docker/docker-compose.yml down",
-    "sync": "node utils/syncModels.js",
-    "seed": "node seed/seedLocalDb.js",
+    "docker:down": "docker compose -f docker/docker-compose.yml down --volumes",
+    "migrate": "npx sequelize-cli db:migrate",
+    "migrate:undo": "npx sequelize-cli db:migrate:undo",
+    "migrate:undo:all": "npx sequelize-cli db:migrate:undo:all",
     "wait": "node utils/waitForDb.js",
-    "launch": "npm run docker:up && npm run wait && npm run sync && npm run seed && npm run dev"
+    "launch": "npm run docker:up && npm run wait && npm run migrate && npm run dev"
   },
   "repository": {
     "type": "git",
@@ -52,6 +53,7 @@
   },
   "devDependencies": {
     "jest": "^30.0.4",
+    "sequelize-cli": "^6.6.3",
     "sequelize-mock": "^0.10.2",
     "supertest": "^7.1.3"
   }

@@ -1,64 +1,55 @@
-const { Sequelize } = require("sequelize");
-const dotenv = require("dotenv");
-dotenv.config({ path: "./config.env" }); // Load environment variables
+const { Client } = require('pg'); 
+const config = require('../config/config'); 
 
-// Determine whether we're in development or testing
-const isTestEnv = process.env.NODE_ENV === "test";
+require('dotenv').config({
+  path: process.env.NODE_ENV === 'test' ? './.env.test' : './.env.development'
+});
 
-// Use different environment variables based on the current environment (dev or test)
-const dbConfig = {
-  database: isTestEnv
-    ? process.env.TEST_DATABASE_NAME
-    : process.env.DEV_DATABASE_NAME,
-  username: isTestEnv
-    ? process.env.TEST_DATABASE_USER
-    : process.env.DEV_DATABASE_USER,
-  password: isTestEnv
-    ? process.env.TEST_DATABASE_PASSWORD
-    : process.env.DEV_DATABASE_PASSWORD,
-  host: isTestEnv
-    ? process.env.TEST_DATABASE_HOST
-    : process.env.DEV_DATABASE_HOST,
-  port: isTestEnv
-    ? process.env.TEST_DATABASE_PORT
-    : process.env.DEV_DATABASE_PORT,
+const env = process.env.NODE_ENV || 'development';
+const dbConfig = config[env]; 
+
+if (!dbConfig) {
+  console.error(`Error: Database configuration not found for NODE_ENV=${env}`);
+  process.exit(1);
+}
+
+const clientConfig = {
+  user: dbConfig.username,
+  password: dbConfig.password,
+  host: dbConfig.host,
+  port: dbConfig.port,
+  database: dbConfig.database,
+  ssl: dbConfig.dialectOptions && dbConfig.dialectOptions.ssl ? dbConfig.dialectOptions.ssl : false
 };
 
-const db = new Sequelize(
-  dbConfig.database,
-  dbConfig.username,
-  dbConfig.password,
-  {
-    dialect: "postgres",
-    host: dbConfig.host,
-    port: dbConfig.port,
-    charset: "utf8",
-    ssl: true,
-    logging: false,
-  }
-);
+const MAX_RETRIES = 30;
+const RETRY_INTERVAL_MS = 2000; 
 
-const checkDbReady = async () => {
-  let attempts = 0;
-  const MAX_ATTEMPTS = 30; 
-  const RETRY_INTERVAL = 2000; 
-
-  while (attempts < MAX_ATTEMPTS) {
+async function waitForDb() {
+  console.log(`Waiting for database (${clientConfig.host}:${clientConfig.port}/${clientConfig.database}) to be ready...`);
+  for (let i = 0; i < MAX_RETRIES; i++) {
+    const client = new Client(clientConfig);
     try {
-      console.log(`Attempting to connect to the database (Attempt ${attempts + 1}/${MAX_ATTEMPTS})...`);
-      await db.authenticate();
-      console.log("Database is ready!");
+      await client.connect(); 
+      console.log('Database is ready!');
+      await client.end(); 
       return; 
-    } catch (error) {
-      attempts++;
-      console.error(`Database not ready yet, retrying in ${RETRY_INTERVAL / 1000} seconds...`, error.message);
-      if (attempts >= MAX_ATTEMPTS) {
-        console.error("Exceeded maximum database connection attempts. Exiting.");
-        throw new Error("Failed to connect to the database after multiple attempts."); 
+    } catch (err) {
+      console.log(`Attempt ${i + 1}/${MAX_RETRIES}: Database not ready yet. Error: ${err.message}. Retrying in ${RETRY_INTERVAL_MS / 1000} seconds...`);
+      await new Promise(resolve => setTimeout(resolve, RETRY_INTERVAL_MS)); 
+    } finally {
+
+      if (client && client._connected) {
+        try {
+          await client.end();
+        } catch (e) {
+         
+        }
       }
-      await new Promise((resolve) => setTimeout(resolve, RETRY_INTERVAL));
     }
   }
-};
+  console.error('Failed to connect to database after multiple retries. Exiting.');
+  process.exit(1); 
+}
 
-checkDbReady();
+waitForDb();
