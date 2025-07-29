@@ -1,15 +1,15 @@
 const express = require("express");
-const authController = require("./../controllers/authController");
-const Users = require("./../models/shared/Users"); 
+const authController = require("./../../controllers/general/authController");
+const Users = require("./../../models/shared/Users"); 
 
 const authRouter = express.Router();
 
-router.post("/signup", authController.signup);
-router.post("/login", authController.login);
-router.get("/validate-token", authController.validateToken);
-router.post("/forgotPassword", authController.forgotPassword);
-router.patch("/resetPassword/:token", authController.resetPassword);
-router.get("/logout", (req, res) => {
+authRouter.post("/signup", authController.signup);
+authRouter.post("/login", authController.login);
+authRouter.get("/validate-token", authController.validateToken);
+authRouter.post("/forgotPassword", authController.forgotPassword);
+authRouter.patch("/resetPassword/:token", authController.resetPassword);
+authRouter.get("/logout", (req, res) => {
   res.cookie("jwt", "loggedout", {
     expires: new Date(Date.now() + 10 * 1000),
     httpOnly: true,
@@ -19,8 +19,8 @@ router.get("/logout", (req, res) => {
     .status(200)
     .json({ status: "success", message: "Logged out successfully." });
 });
-router.use(authController.protect(Users));
-router.post("/requestPasswordChange", authController.requestPasswordChange);
-router.patch("/updatePassword", authController.updatePassword);
+authRouter.use(authController.protect(Users));
+authRouter.post("/requestPasswordChange", authController.requestPasswordChange);
+authRouter.patch("/updatePassword", authController.updatePassword);
 
 module.exports = authRouter;

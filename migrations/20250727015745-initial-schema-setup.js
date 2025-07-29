@@ -468,8 +468,8 @@ module.exports = {
     // 13. Create CommissionOrders Table
     await queryInterface.createTable("commissionOrders", {
       id: {
-        type: DataTypes.UUID,
-        defaultValue: DataTypes.UUIDV4,
+        type: DataTypes.BIGINT,
+        autoIncrement: true,
         primaryKey: true,
         allowNull: false,
       },
@@ -529,7 +529,7 @@ module.exports = {
         allowNull: false,
       },
       commissionOrderId: {
-        type: DataTypes.UUID,
+        type: DataTypes.BIGINT,
         unique: true, // Ensures only one review per commission order
         allowNull: false,
         references: { model: "commissionOrders", key: "id" },

@@ -14,7 +14,7 @@ const CommissionReviews = db.define(
       allowNull: false,
     },
     commissionOrderId: {
-      type: DataTypes.UUID,
+      type: DataTypes.BIGINT,
       unique: true,
       allowNull: false,
       validate: {

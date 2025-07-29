@@ -3,8 +3,8 @@ const db = require("./server");
 const morgan = require("morgan");
 const cookieParser = require("cookie-parser");
 const AppError = require("./utils/appError");
-const globalErrorHandler = require("./controllers/errorController");
-const authRoutes = require("./routes/authRoutes");
+const globalErrorHandler = require("./controllers/general/errorController");
+const authRoutes = require("./routes/general/authRoutes");
 
 const app = express();
 
@@ -25,16 +25,11 @@ app.set("trust proxy", true);
 
 app.use("/api/v1/auth", authRoutes);
 
-app.all("*", (req, res, next) => {
-  next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
+app.use((req, res, next) => {
+  // next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
+  res.status(404).send("404 Not Found");
 });
 
 app.use(globalErrorHandler);
-
-db.authenticate().then(() => {
-  app.listen(port, () => {
-    console.log(`Database connection successful, listening on port ${port}`);
-  });
-});
 
 module.exports = app;

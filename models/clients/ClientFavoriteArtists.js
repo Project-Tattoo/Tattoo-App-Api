@@ -3,7 +3,7 @@ const db = require("./../../server");
 const ClientProfiles = require("./ClientProfiles");
 const ArtistProfiles = require("./../artists/ArtistProfiles");
 
-const ClientFavoriteArtists = define(
+const ClientFavoriteArtists = db.define(
   "clientFavoriteArtists",
   {
     clientId: {

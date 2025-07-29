@@ -10,9 +10,11 @@ process.on("uncaughtException", (err) => {
   process.exit(1);
 });
 
-dotenv.config({ path: "./config.env" });
+process.env.NODE_ENV = process.env.NODE_ENV || 'development'; 
+require('dotenv').config({ path: `.env.${process.env.NODE_ENV}` });
 
-const envConfig = config[process.env.NODE_ENV || "development"];
+const env = process.env.NODE_ENV;
+const envConfig = config[env];
 
 if (!envConfig) {
   console.error("Invalid NODE_ENV:", process.env.NODE_ENV);
@@ -27,7 +29,7 @@ if (envConfig.database && envConfig.username && envConfig.password) {
     {
       dialect: envConfig.dialect,
       host: envConfig.host,
-      port: 5432,
+      port: envConfig.port,
       charset: "utf8",
       ssl: process.env.NODE_ENV === "production", 
       logging: process.env.NODE_ENV === "test" ? false : console.log,

@@ -7,8 +7,8 @@
     "docker-test:up": "docker compose -f docker/docker-test-compose.yml up -d",
     "docker-test:down": "docker compose -f docker/docker-test-compose.yml down --volumes",
     "test": "cross-env NODE_ENV=test npm run docker-test:up && cross-env NODE_ENV=test npm run wait && cross-env NODE_ENV=test jest --forceExit",
-    "start": "node app.js",
-    "dev": "nodemon app.js",
+    "start": "node --trace-warnings start.js",
+    "dev": "nodemon --trace-warnings start.js",
     "docker:up": "docker compose -f docker/docker-compose.yml up -d",
     "docker:down": "docker compose -f docker/docker-compose.yml down --volumes",
     "migrate": "npx sequelize-cli db:migrate",
@@ -52,8 +52,10 @@
     "xss-clean": "^0.1.4"
   },
   "devDependencies": {
+    "@testing-library/react": "^16.3.0",
     "cross-env": "^10.0.0",
     "jest": "^30.0.4",
+    "nodemon": "^3.1.10",
     "sequelize-cli": "^6.6.3",
     "sequelize-mock": "^0.10.2",
     "supertest": "^7.1.3"

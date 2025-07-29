@@ -2,10 +2,11 @@ const { Client } = require("pg");
 const config = require("../config/config");
 
 console.log("Initial NODE_ENV:", process.env.NODE_ENV);
-require("dotenv").config({
-  path: process.env.NODE_ENV === "test" ? "./.env.test" : "./.env.development",
-  debug: true, // This will show which file is being loaded
-});
+
+process.env.NODE_ENV = process.env.NODE_ENV || 'test'; // Force test env if not set
+
+require('dotenv').config({ path: `.env.${process.env.NODE_ENV}` })
+
 console.log("After dotenv NODE_ENV:", process.env.NODE_ENV);
 
 const env = process.env.NODE_ENV || "development";
@@ -35,7 +36,6 @@ async function waitForDb() {
   console.log(process.env.NODE_ENV);
   console.log(process.env.DB_USER)
   console.log(process.env.DB_PASSWORD)
-  console.log(process.env.DB_NAME_TEST)
   console.log(
     `Waiting for database (${clientConfig.host}:${clientConfig.port}/${clientConfig.database}) to be ready...`
   );
@@ -68,3 +68,5 @@ async function waitForDb() {
 }
 
 waitForDb();
+
+module.exports = waitForDb

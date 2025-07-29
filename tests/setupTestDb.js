@@ -20,6 +20,9 @@ require('./../models/associations');
 
 async function connectToTestDB() {
   console.log('Connecting to test database...');
+  console.log(db.config.host)
+  console.log(db.config.port)
+  console.log(db.config.database)
   try {
     await db.authenticate();
     console.log('Test database connection established.');

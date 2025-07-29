@@ -2,12 +2,13 @@ const crypto = require("crypto");
 const { promisify } = require("util");
 const jwt = require("jsonwebtoken");
 const catchAsync = require("./../../utils/catchAsync");
-const AppError = require("./../../utils/apiFeatures");
+const AppError = require("./../../utils/appError");
 const Users = require("./../../models/shared/Users");
 const EmailPreference = require("./../../models/shared/EmailPreferences");
-const TOSAgreement = require("./../../models/shared/TOSAgreement"); 
-const ArtistProfiles = require("./../../models/artists/ArtistProfiles"); 
+const TOSAgreement = require("./../../models/shared/TOSAgreement");
+const ArtistProfiles = require("./../../models/artists/ArtistProfiles");
 const ClientProfiles = require("./../../models/clients/ClientProfiles");
+const db = require("./../../server");
 
 //////////////////////// JWT LOGIC ////////////////////////
 
@@ -20,12 +21,15 @@ const ClientProfiles = require("./../../models/clients/ClientProfiles");
  * @param {Function} next - Express next middleware function.
  */
 exports.validateToken = catchAsync(async (req, res, next) => {
-  const token = req.headers.authorization && req.headers.authorization.startsWith("Bearer")
-    ? req.headers.authorization.split(" ")[1]
-    : req.cookies.jwt; 
+  const token =
+    req.headers.authorization && req.headers.authorization.startsWith("Bearer")
+      ? req.headers.authorization.split(" ")[1]
+      : req.cookies.jwt;
 
   if (!token) {
-    return res.status(401).json({ valid: false, message: "No token provided." });
+    return res
+      .status(401)
+      .json({ valid: false, message: "No token provided." });
   }
 
   try {
@@ -38,7 +42,9 @@ exports.validateToken = catchAsync(async (req, res, next) => {
 
     res.json({ valid: true, message: "Token is valid." });
   } catch (error) {
-    res.status(401).json({ valid: false, message: "Invalid or expired token." });
+    res
+      .status(401)
+      .json({ valid: false, message: "Invalid or expired token." });
   }
 });
 
@@ -74,9 +80,10 @@ const signToken = (id) => {
 const createSendToken = (user, statusCode, req, res) => {
   const token = signToken(user.id);
 
-  const cookieExpiresInMs = process.env.NODE_ENV === "production"
-    ? 4 * 60 * 60 * 1000 + 30 * 60 * 1000 
-    : 90 * 24 * 60 * 60 * 1000; 
+  const cookieExpiresInMs =
+    process.env.NODE_ENV === "production"
+      ? 4 * 60 * 60 * 1000 + 30 * 60 * 1000
+      : 90 * 24 * 60 * 60 * 1000;
 
   res.cookie("jwt", token, {
     expires: new Date(Date.now() + cookieExpiresInMs),
@@ -86,7 +93,7 @@ const createSendToken = (user, statusCode, req, res) => {
 
   user.passwordHash = undefined;
 
-  res.status(statusCode).json({
+  return res.status(statusCode).json({
     status: "success",
     token,
     data: {
@@ -173,6 +180,13 @@ exports.restrictTo = (...roles) => {
 
 //////////////////////// USER MANAGEMENT LOGIC ////////////////////////
 
+const normalizeIpAddress = (ip) => {
+  if (ip && ip.startsWith("::ffff:")) {
+    return ip.substring(7); // Remove '::ffff:'
+  }
+  return ip;
+};
+
 /**
  * @function signup
  * @description Handles user registration, creating a base User and a role-specific profile.
@@ -180,64 +194,130 @@ exports.restrictTo = (...roles) => {
  * @returns {Function} An Express middleware function.
  */
 exports.signup = catchAsync(async (req, res, next) => {
-  const { email, password, passwordConfirm, role, displayName, bio, city, state, zipcode, stylesOffered } = req.body; // Destructure all possible signup fields
+  const {
+    email,
+    password,
+    passwordConfirm,
+    role,
+    displayName,
+    bio,
+    city,
+    state,
+    zipcode,
+    stylesOffered,
+  } = req.body;
 
   if (!email || !password || !passwordConfirm || !role) {
-    return next(new AppError("Please provide email, password, password confirmation, and role.", 400));
+    return next(
+      new AppError(
+        "Please provide email, password, password confirmation, and role.",
+        400
+      )
+    );
   }
+
   if (password !== passwordConfirm) {
     return next(new AppError("Passwords do not match.", 400));
   }
 
-  const newUser = await Users.create({
-    email: email.toLowerCase(),
-    passwordHash: password, 
-    role,
-    isActive: true, 
-    verifiedEmail: false, 
-  });
-
-  await EmailPreference.create({ userId: newUser.id });
-
-  await TOSAgreement.create({
-    userId: newUser.id,
-    tosVersion: '1.0', 
-    agreedAt: new Date(),
-    ipAddress: req.ip, 
-  });
-
-  let profile;
-  switch (role) {
-    case 'artist':
-      if (!displayName || !city || !state || !zipcode) {
-        await Users.destroy({ where: { id: newUser.id } });
-        return next(new AppError("Please provide display name, city, state, and zipcode for artist registration.", 400));
-      }
-      profile = await ArtistProfiles.create({
-        userId: newUser.id,
-        displayName,
-        bio: bio || null, 
-        city,
-        state,
-        zipcode,
-        stylesOffered: stylesOffered || [],
-      });
-      break;
-    case 'client':
-      profile = await ClientProfiles.create({
-        userId: newUser.id,
-        displayName: displayName || null,
-        bio: bio || null,
-      });
-      break;
-    case 'admin':
-      return next(new AppError("Admin accounts cannot be registered via public signup.", 403));
-    default:
-      await Users.destroy({ where: { id: newUser.id } });
-      return next(new AppError("Invalid user role specified.", 400));
+  if (role === "admin") {
+    return next(
+      new AppError(
+        "Admin accounts cannot be registered via public signup.",
+        403
+      )
+    );
   }
 
-  createSendToken(newUser, 201, req, res); 
+  if (!["artist", "client"].includes(role)) {
+    return next(new AppError("Invalid user role specified.", 400));
+  }
+
+  if (role === "artist" && (!displayName || !city || !state || !zipcode)) {
+    return next(
+      new AppError(
+        "Please provide display name, city, state, and zipcode for artist registration.",
+        400
+      )
+    );
+  }
+
+  const t = await db.transaction();
+
+  try {
+    const newUser = await Users.create(
+      {
+        email: email.toLowerCase(),
+        passwordHash: password,
+        role,
+        isActive: true,
+        verifiedEmail: false,
+      },
+      { transaction: t }
+    );
+
+    await EmailPreference.create({ userId: newUser.id }, { transaction: t });
+
+    const ipAddress = normalizeIpAddress(req.ip);
+    await TOSAgreement.create(
+      {
+        userId: newUser.id,
+        tosVersion: "1.0",
+        agreedAt: new Date(),
+        ipAddress,
+      },
+      { transaction: t }
+    );
+
+    if (role === "artist") {
+      await ArtistProfiles.create(
+        {
+          userId: newUser.id,
+          displayName,
+          bio: bio || null,
+          city,
+          state,
+          zipcode,
+          stylesOffered: stylesOffered || [],
+        },
+        { transaction: t }
+      );
+    }
+
+    if (role === "client") {
+      await ClientProfiles.create(
+        {
+          userId: newUser.id,
+          displayName: displayName || null,
+          bio: bio || null,
+        },
+        { transaction: t }
+      );
+    }
+
+    await t.commit();
+    return createSendToken(newUser, 201, req, res);
+  } catch (error) {
+    await t.rollback();
+    if (error.name === "SequelizeUniqueConstraintError") {
+      return next(
+        new AppError(
+          `Duplicate field value: ${
+            error.fields[Object.keys(error.fields)[0]]
+          }. Please use another value!`,
+          400
+        )
+      );
+    }
+
+    if (error.name === "SequelizeValidationError") {
+      const errors = error.errors.map((err) => err.message);
+      return next(
+        new AppError(`Invalid input data: ${errors.join(". ")}`, 400)
+      );
+    }
+    return next(error);
+  }
 });
 
 //////////////////////// LOGIN LOGIC ////////////////////////
@@ -254,7 +334,7 @@ exports.login = catchAsync(async (req, res, next) => {
   if (!lowerCaseEmail || !password)
     return next(new AppError("Please provide both email and password.", 400));
 
-  const user = await Users.findOne({ 
+  const user = await Users.findOne({
     where: { email: lowerCaseEmail },
   });
 
@@ -271,7 +351,8 @@ exports.login = catchAsync(async (req, res, next) => {
  * Does not block access, but makes user info available if logged in.
  * @returns {Function} An Express middleware function.
  */
-exports.isLoggedIn = catchAsync(async (req, res, next) => { // Removed User param, use Users model directly
+exports.isLoggedIn = catchAsync(async (req, res, next) => {
+  // Removed User param, use Users model directly
   if (req.cookies.jwt) {
     try {
       const decoded = await promisify(jwt.verify)(
@@ -281,7 +362,7 @@ exports.isLoggedIn = catchAsync(async (req, res, next) => { // Removed User para
           : process.env.DEV_JWT_SECRET
       );
 
-      const currentUser = await Users.findByPk(decoded.id); 
+      const currentUser = await Users.findByPk(decoded.id);
       if (!currentUser) return next();
 
       if (currentUser.changedPasswordAfter(decoded.iat)) return next();
@@ -303,7 +384,7 @@ exports.isLoggedIn = catchAsync(async (req, res, next) => { // Removed User para
  * @description Handles forgotten password requests. Generates a reset token and sends it via email.
  * @returns {Function} An Express middleware function.
  */
-exports.forgotPassword = catchAsync(async (req, res, next) => { 
+exports.forgotPassword = catchAsync(async (req, res, next) => {
   const user = await Users.findOne({
     where: { email: req.body.email },
   });
@@ -338,7 +419,7 @@ exports.forgotPassword = catchAsync(async (req, res, next) => {
  * @description Allows a logged-in user to request a password change (sends a token to their email).
  * @returns {Function} An Express middleware function.
  */
-exports.requestPasswordChange = catchAsync(async (req, res, next) => { 
+exports.requestPasswordChange = catchAsync(async (req, res, next) => {
   if (!req.user) {
     return next(new AppError("User not found in request. Please log in.", 401));
   }
@@ -375,7 +456,7 @@ exports.requestPasswordChange = catchAsync(async (req, res, next) => {
  * @description Resets a user's password using a valid reset token.
  * @returns {Function} An Express middleware function.
  */
-exports.resetPassword = catchAsync(async (req, res, next) => { 
+exports.resetPassword = catchAsync(async (req, res, next) => {
   const hashedToken = crypto
     .createHash("sha256")
     .update(req.params.token)
@@ -413,7 +494,10 @@ exports.updatePassword = catchAsync(async (req, res, next) => {
   }
   const user = await Users.findByPk(req.user.id);
 
-  const isCorrect = await user.correctPassword(req.body.passwordCurrent, user.passwordHash);
+  const isCorrect = await user.correctPassword(
+    req.body.passwordCurrent,
+    user.passwordHash
+  );
   if (!isCorrect)
     return next(new AppError("Your current password is wrong.", 401));
 
