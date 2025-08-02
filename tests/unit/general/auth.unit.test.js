@@ -226,8 +226,8 @@ describe("Auth API Unit Tests", () => {
 
     await new Promise((resolve) => {
       authController.signup(req, res, (...args) => {
-        next(...args); 
-        resolve(); 
+        next(...args);
+        resolve();
       });
     });
     await new Promise((resolve) => setImmediate(resolve));
@@ -240,9 +240,66 @@ describe("Auth API Unit Tests", () => {
     expect(error.statusCode).toBe(400);
   });
 
-  xit("should handle a SequelizeValidationError", async () => {});
+  it("should handle a SequelizeValidationError", async () => {
+    const req = mockRequest({
+      body: {
+        email: "invalid-email",
+        password: "Password123!",
+        passwordConfirm: "Password123!",
+        role: "client",
+      },
+    });
+    const res = mockResponse();
+    const next = jest.fn();
 
-  xit("should handle a general error during transaction", async () => {});
+    const error = mockSequelizeValidationError(["Email format is invalid."]);
+
+    jest.spyOn(Users, "create").mockRejectedValue(error);
+
+    await new Promise((resolve) => {
+      authController.signup(req, res, (...args) => {
+        next(...args);
+        resolve();
+      });
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(next).toHaveBeenCalled();
+
+    const receivedError = next.mock.calls[0][0];
+    expect(receivedError).toBeInstanceOf(AppError);
+    expect(receivedError.message).toMatch(/Invalid input data: /);
+    expect(receivedError.statusCode).toBe(400);
+  });
+
+  it("should handle a general error during transaction", async () => {
+    const req = mockRequest({
+      body: {
+        email: "test@example.com",
+        password: "Password123!",
+        passwordConfirm: "Password123!",
+        role: "client",
+      },
+    });
+    const res = mockResponse();
+    const next = jest.fn();
+
+    const generalError = new Error("Something went wrong");
+    jest.spyOn(Users, "create").mockRejectedValue(generalError);
+
+    await new Promise((resolve) => {
+      authController.signup(req, res, (...args) => {
+        next(...args);
+        resolve();
+      });
+    });
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(next).toHaveBeenCalled();
+    const receivedError = next.mock.calls[0][0];
+    expect(receivedError).toBe(generalError);
+  });
 
   // --- Login Tests ---
   xit("should prevent login if email or password is missing", async () => {});
