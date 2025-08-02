@@ -423,7 +423,7 @@ describe("Auth API Unit Tests", () => {
     const next = jest.fn();
 
     jest.spyOn(jwt, "verify").mockImplementation((token, secret, callback) => {
-      callback(null, { id: 1 }); // simulate a decoded token
+      callback(null, { id: 1 });
     });
 
     await authController.validateToken(req, res, next);
@@ -434,7 +434,7 @@ describe("Auth API Unit Tests", () => {
       message: "Token is valid.",
     });
 
-    jwt.verify.mockRestore(); // clean up
+    jwt.verify.mockRestore();
   });
 
   it("should mock jwt.verify to resolve provided token in cookies", async () => {
@@ -449,11 +449,11 @@ describe("Auth API Unit Tests", () => {
     const next = jest.fn();
 
     jest.spyOn(jwt, "verify").mockImplementation((token, secret, callback) => {
-      callback(null, { id: 1 }); // simulate valid decoded token
+      callback(null, { id: 1 });
     });
 
     await authController.validateToken(req, res, next);
-    await new Promise((resolve) => setImmediate(resolve)); // wait for async to settle
+    await new Promise((resolve) => setImmediate(resolve));
 
     expect(res.json).toHaveBeenCalledWith({
       valid: true,
@@ -475,7 +475,7 @@ describe("Auth API Unit Tests", () => {
     const next = jest.fn();
 
     jest.spyOn(jwt, "verify").mockImplementation((token, secret, callback) => {
-      callback(new Error("Token is malformed or expired")); // simulate JWT error
+      callback(new Error("Token is malformed or expired"));
     });
 
     await authController.validateToken(req, res, next);
@@ -489,27 +489,249 @@ describe("Auth API Unit Tests", () => {
 
     jwt.verify.mockRestore();
   });
-  
+
   // --- Protect Tests ---
-  xit("should call AppError when a user is not logged in", async () => {});
+  it("should call AppError when a user is not logged in", async () => {
+    const req = mockRequest({ headers: {}, cookies: {} });
+    const res = mockResponse();
+    const next = jest.fn();
 
-  xit("should throw an error when verifying token if not logged in", async () => {});
+    const protectMiddleware = authController.protect(Users);
+    await protectMiddleware(req, res, next);
 
-  xit("should mock Users.findByPk to return null after token is decoded", () => {});
+    const err = next.mock.calls[0][0];
+    expect(next).toHaveBeenCalled();
+    expect(err).toBeInstanceOf(AppError);
+    expect(err.message).toMatch(/not logged in/i);
+    expect(err.statusCode).toBe(401);
+  });
 
-  xit("should mock changedPasswordAfter a token has been issues, signaling to log in again", () => {});
+  it("should throw an error when verifying token if not logged in", async () => {
+    const req = mockRequest({
+      headers: {
+        authorization: "Bearer invalid.token",
+      },
+      cookies: {},
+    });
+    const res = mockResponse();
+    const next = jest.fn();
 
-  xit("should mock a successful access into protected route", () => {});
+    jest.spyOn(jwt, "verify").mockImplementation((token, secret, callback) => {
+      setTimeout(() => {
+        callback(new jwt.JsonWebTokenError("jwt malformed"));
+      }, 0);
+    });
+
+    const protectMiddleware = authController.protect(Users);
+    await new Promise((resolve) => {
+      protectMiddleware(req, res, (...args) => {
+        next(...args);
+        resolve();
+      });
+    });
+
+    expect(next).toHaveBeenCalled();
+    const err = next.mock.calls[0][0];
+    expect(err).toBeInstanceOf(jwt.JsonWebTokenError);
+    expect(err.message).toMatch(/jwt malformed/i);
+
+    jwt.verify.mockRestore();
+  });
+
+  it("should mock Users.findByPk to return null after token is decoded", async () => {
+    const req = mockRequest({
+      headers: {
+        authorization: "Bearer valid.token",
+      },
+      cookies: {},
+    });
+    const res = mockResponse();
+    const next = jest.fn();
+
+    jest.spyOn(jwt, "verify").mockImplementation((token, secret, callback) => {
+      setTimeout(() => {
+        callback(null, { id: 999, iat: Date.now() / 1000 });
+      }, 0);
+    });
+
+    const mockUsers = {
+      findByPk: jest.fn().mockResolvedValue(null),
+    };
+
+    const protectMiddleware = authController.protect(mockUsers);
+    await new Promise((resolve) => {
+      protectMiddleware(req, res, (...args) => {
+        next(...args);
+        resolve();
+      });
+    });
+
+    expect(mockUsers.findByPk).toHaveBeenCalledWith(999);
+    expect(next).toHaveBeenCalled();
+
+    const err = next.mock.calls[0][0];
+    expect(err).toBeInstanceOf(AppError);
+    expect(err.message).toMatch(/no longer exists/i);
+    expect(err.statusCode).toBe(401);
+
+    jwt.verify.mockRestore();
+  });
+
+  it("should mock changedPasswordAfter a token has been issued, signaling to log in again", async () => {
+    const req = mockRequest({
+      headers: {
+        authorization: "Bearer valid.token",
+      },
+      cookies: {},
+    });
+    const res = mockResponse();
+    const next = jest.fn();
+
+    jest.spyOn(jwt, "verify").mockImplementation((token, secret, callback) => {
+      setTimeout(() => {
+        callback(null, { id: 123, iat: Math.floor(Date.now() / 1000) - 100 });
+      }, 0);
+    });
+
+    const fakeUser = {
+      changedPasswordAfter: jest.fn().mockResolvedValue(true),
+    };
+
+    const mockUsers = {
+      findByPk: jest.fn().mockResolvedValue(fakeUser),
+    };
+
+    const protectMiddleware = authController.protect(mockUsers);
+    await new Promise((resolve) => {
+      protectMiddleware(req, res, (...args) => {
+        next(...args);
+        resolve();
+      });
+    });
+
+    expect(fakeUser.changedPasswordAfter).toHaveBeenCalled();
+    expect(next).toHaveBeenCalled();
+
+    const err = next.mock.calls[0][0];
+    expect(err).toBeInstanceOf(AppError);
+    expect(err.message).toMatch(/password has been changed/i);
+    expect(err.statusCode).toBe(401);
+
+    jwt.verify.mockRestore();
+  });
+
+  it("should mock a successful access into protected route", async () => {
+    const req = mockRequest({
+      headers: {
+        authorization: "Bearer valid.token",
+      },
+      cookies: {},
+    });
+    const res = mockResponse();
+    const next = jest.fn();
+
+    const fakeUser = {
+      id: 123,
+      email: "user@example.com",
+      changedPasswordAfter: jest.fn().mockResolvedValue(false),
+    };
+
+    jest.spyOn(jwt, "verify").mockImplementation((token, secret, callback) => {
+      setTimeout(() => {
+        callback(null, {
+          id: fakeUser.id,
+          iat: Math.floor(Date.now() / 1000) - 100,
+        });
+      }, 0);
+    });
+
+    const mockUsers = {
+      findByPk: jest.fn().mockResolvedValue(fakeUser),
+    };
+
+    const protectMiddleware = authController.protect(mockUsers);
+
+    await new Promise((resolve) => {
+      protectMiddleware(req, res, (...args) => {
+        next(...args);
+        resolve();
+      });
+    });
+
+    expect(jwt.verify).toHaveBeenCalled();
+    expect(mockUsers.findByPk).toHaveBeenCalledWith(fakeUser.id);
+    expect(fakeUser.changedPasswordAfter).toHaveBeenCalled();
+    expect(req.user).toBe(fakeUser);
+    expect(res.locals.user).toBe(fakeUser);
+    expect(next).toHaveBeenCalledWith();
+
+    jwt.verify.mockRestore();
+  });
 
   // --- Restrictto Tests ---
-  xit("should throw next AppError when req.user is not set", async () => {});
+  it("should throw next AppError when req.user is not set", () => {
+    const req = {};
+    const res = mockResponse();
+    const next = jest.fn();
 
-  xit("should throw next AppError when a client tries to access an artist route", () => {});
+    const middleware = authController.restrictTo("artist");
+    middleware(req, res, next);
 
-  xit("should allow an artist to access an artist route", () => {});
+    expect(next).toHaveBeenCalled();
+    const err = next.mock.calls[0][0];
+    expect(err).toBeInstanceOf(AppError);
+    expect(err.statusCode).toBe(403);
+    expect(err.message).toMatch(/permission/i);
+  });
+
+  it("should throw next AppError when a client tries to access an artist route", () => {
+    const req = {
+      user: { role: "client" },
+    };
+    const res = mockResponse();
+    const next = jest.fn();
+
+    const middleware = authController.restrictTo("artist");
+    middleware(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    const err = next.mock.calls[0][0];
+    expect(err).toBeInstanceOf(AppError);
+    expect(err.statusCode).toBe(403);
+    expect(err.message).toMatch(/permission/i);
+  });
+
+  it("should allow an artist to access an artist route", () => {
+    const req = {
+      user: { role: "artist" },
+    };
+    const res = mockResponse();
+    const next = jest.fn();
+
+    const middleware = authController.restrictTo("artist");
+    middleware(req, res, next);
+
+    expect(next).toHaveBeenCalledWith();
+  });
 
   // --- ForgotPassword Tests ---
-  xit("should call next AppError when there is no user matching provided email", async () => {});
+  it("should call next AppError when there is no user matching provided email", async () => {
+    const req = { body: { email: "nonexistent@example.com" } };
+    const res = mockResponse();
+    const next = jest.fn();
+
+    jest.spyOn(Users, "findOne").mockResolvedValue(null);
+
+    await authController.forgotPassword(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    const err = next.mock.calls[0][0];
+    expect(err).toBeInstanceOf(AppError);
+    expect(err.message).toMatch(/no user with that email/i);
+    expect(err.statusCode).toBe(404);
+
+    Users.findOne.mockRestore();
+  });
 
   xit("should mock successful createPasswordResetToken and email send", async () => {
     // Cant implement yet, email logic not set up
@@ -520,11 +742,41 @@ describe("Auth API Unit Tests", () => {
   });
 
   // --- RequestPasswordChange Tests ---
-  xit("should call next AppError when no user is logged in", async () => {});
+  it("should call next AppError when no user is logged in", async () => {
+    const req = {};
+    const res = mockResponse();
+    const next = jest.fn();
 
-  xit("should call next AppError when user cannot be found", async () => {});
+    await authController.requestPasswordChange(req, res, next);
 
-  xit("should call res.status(200).json(...) when successful", async () => {});
+    expect(next).toHaveBeenCalled();
+    const err = next.mock.calls[0][0];
+    expect(err).toBeInstanceOf(AppError);
+    expect(err.message).toMatch(/please log in/i);
+    expect(err.statusCode).toBe(401);
+  });
+
+  it("should call next AppError when user cannot be found", async () => {
+    const req = { user: { id: 1 } };
+    const res = mockResponse();
+    const next = jest.fn();
+
+    jest.spyOn(Users, "findByPk").mockResolvedValue(null);
+
+    await authController.requestPasswordChange(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    const err = next.mock.calls[0][0];
+    expect(err).toBeInstanceOf(AppError);
+    expect(err.message).toMatch(/couldn't find/i);
+    expect(err.statusCode).toBe(404);
+
+    Users.findByPk.mockRestore();
+  });
+
+  xit("should call res.status(200).json(...) when successful", async () => {
+    // Cant implement yet, email logic not set up
+  });
 
   xit("should fail to send an email when passwordResetToken and passwordResetExpires are undefined", async () => {
     // Cant implement yet, email logic not set up
