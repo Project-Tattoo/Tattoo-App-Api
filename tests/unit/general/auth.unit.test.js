@@ -302,12 +302,97 @@ describe("Auth API Unit Tests", () => {
   });
 
   // --- Login Tests ---
-  xit("should prevent login if email or password is missing", async () => {});
+  it("should prevent login if email or password is missing", async () => {
+    const res = mockResponse();
+    const next = jest.fn();
 
-  xit("should mock a user not being found with provided condentials", async () => {});
+    const cases = [
+      { email: "", password: "testpass" },
+      { email: "test@example.com", password: "" },
+      { email: "", password: "" },
+      { email: null, password: "testpass" },
+      { email: "test@example.com", password: null },
+    ];
 
-  xit("should prevent login with an incorrect password", async () => {});
+    for (const body of cases) {
+      const req = mockRequest({ body });
 
+      await new Promise((resolve) => {
+        authController.login(req, res, (...args) => {
+          next(...args);
+          resolve();
+        });
+      });
+
+      expect(next).toHaveBeenCalled();
+      const err = next.mock.calls[next.mock.calls.length - 1][0];
+      expect(err).toBeInstanceOf(AppError);
+      expect(err.message).toMatch(/email and password/i);
+      expect(err.statusCode).toBe(400);
+    }
+  });
+
+  it("should mock a user not being found with provided credentials", async () => {
+    const req = mockRequest({
+      body: {
+        email: "nonexistent@example.com",
+        password: "somePassword123",
+      },
+    });
+    const res = mockResponse();
+    const next = jest.fn();
+
+    jest.spyOn(Users, "findOne").mockResolvedValue(null);
+
+    await new Promise((resolve) => {
+      authController.login(req, res, (...args) => {
+        next(...args);
+        resolve();
+      });
+    });
+    await new Promise((r) => setImmediate(r));
+
+    expect(next).toHaveBeenCalled();
+    const err = next.mock.calls[0][0];
+    expect(err).toBeInstanceOf(AppError);
+    expect(err.message).toMatch(/incorrect email or password/i);
+    expect(err.statusCode).toBe(401);
+  });
+
+  it("should prevent login with an incorrect password", async () => {
+    const req = mockRequest({
+      body: {
+        email: "valid@example.com",
+        password: "wrongPassword123",
+      },
+    });
+    const res = mockResponse();
+    const next = jest.fn();
+
+    const mockUser = {
+      id: 1,
+      email: "valid@example.com",
+      passwordHash: "hashedpassword",
+      correctPassword: jest.fn().mockResolvedValue(false),
+    };
+
+    jest.spyOn(Users, "findOne").mockResolvedValue(mockUser);
+
+    await new Promise((resolve) => {
+      authController.login(req, res, (...args) => {
+        next(...args);
+        resolve();
+      });
+    });
+    await new Promise((r) => setImmediate(r));
+
+    expect(next).toHaveBeenCalled();
+    const err = next.mock.calls[0][0];
+    expect(err).toBeInstanceOf(AppError);
+    expect(err.message).toMatch(/incorrect email or password/i);
+    expect(err.statusCode).toBe(401);
+  });
+  
   // --- Validate Token Tests ---
   xit("should reject when no token is provided", async () => {});
 
