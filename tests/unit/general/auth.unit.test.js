@@ -392,16 +392,104 @@ describe("Auth API Unit Tests", () => {
     expect(err.message).toMatch(/incorrect email or password/i);
     expect(err.statusCode).toBe(401);
   });
-  
+
   // --- Validate Token Tests ---
-  xit("should reject when no token is provided", async () => {});
+  it("should reject when no token is provided", async () => {
+    const req = mockRequest({
+      headers: {},
+      cookies: {},
+    });
+    const res = mockResponse();
+    const next = jest.fn();
 
-  xit("should mock jwt.verify to resolve provided token in headers", async () => {});
+    await authController.validateToken(req, res, next);
 
-  xit("should mock jwt.verify to resolve provided token in cookies", async () => {});
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({
+      valid: false,
+      message: "No token provided.",
+    });
+  });
 
-  xit("should mock jwt.verify to reject with an error for expired or malformed tokens", async () => {});
+  it("should mock jwt.verify to resolve provided token in headers", async () => {
+    const fakeToken = "valid.header.payload";
+    const req = mockRequest({
+      headers: {
+        authorization: `Bearer ${fakeToken}`,
+      },
+      cookies: {},
+    });
+    const res = mockResponse();
+    const next = jest.fn();
 
+    jest.spyOn(jwt, "verify").mockImplementation((token, secret, callback) => {
+      callback(null, { id: 1 }); // simulate a decoded token
+    });
+
+    await authController.validateToken(req, res, next);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(res.json).toHaveBeenCalledWith({
+      valid: true,
+      message: "Token is valid.",
+    });
+
+    jwt.verify.mockRestore(); // clean up
+  });
+
+  it("should mock jwt.verify to resolve provided token in cookies", async () => {
+    const fakeToken = "valid.header.payload";
+    const req = mockRequest({
+      headers: {},
+      cookies: {
+        jwt: fakeToken,
+      },
+    });
+    const res = mockResponse();
+    const next = jest.fn();
+
+    jest.spyOn(jwt, "verify").mockImplementation((token, secret, callback) => {
+      callback(null, { id: 1 }); // simulate valid decoded token
+    });
+
+    await authController.validateToken(req, res, next);
+    await new Promise((resolve) => setImmediate(resolve)); // wait for async to settle
+
+    expect(res.json).toHaveBeenCalledWith({
+      valid: true,
+      message: "Token is valid.",
+    });
+
+    jwt.verify.mockRestore();
+  });
+
+  it("should mock jwt.verify to reject with an error for expired or malformed tokens", async () => {
+    const fakeToken = "invalid.token.payload";
+    const req = mockRequest({
+      headers: {
+        authorization: `Bearer ${fakeToken}`,
+      },
+      cookies: {},
+    });
+    const res = mockResponse();
+    const next = jest.fn();
+
+    jest.spyOn(jwt, "verify").mockImplementation((token, secret, callback) => {
+      callback(new Error("Token is malformed or expired")); // simulate JWT error
+    });
+
+    await authController.validateToken(req, res, next);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({
+      valid: false,
+      message: "Invalid or expired token.",
+    });
+
+    jwt.verify.mockRestore();
+  });
+  
   // --- Protect Tests ---
   xit("should call AppError when a user is not logged in", async () => {});
 
