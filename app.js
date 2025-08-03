@@ -26,8 +26,7 @@ app.set("trust proxy", true);
 app.use("/api/v1/auth", authRoutes);
 
 app.use((req, res, next) => {
-  // next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
-  res.status(404).send("404 Not Found");
+  next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
 });
 
 app.use(globalErrorHandler);

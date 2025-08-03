@@ -8,7 +8,7 @@ authRouter.post("/signup", authController.signup);
 authRouter.post("/login", authController.login);
 authRouter.get("/validate-token", authController.validateToken);
 authRouter.post("/forgotPassword", authController.forgotPassword);
-authRouter.patch("/resetPassword/:token", authController.resetPassword);
+authRouter.patch("/resetPassword", authController.resetPassword);
 authRouter.get("/logout", (req, res) => {
   res.cookie("jwt", "loggedout", {
     expires: new Date(Date.now() + 10 * 1000),

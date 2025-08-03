@@ -9,6 +9,7 @@ const TOSAgreement = require("./../../models/shared/TOSAgreement");
 const ArtistProfiles = require("./../../models/artists/ArtistProfiles");
 const ClientProfiles = require("./../../models/clients/ClientProfiles");
 const db = require("./../../server");
+const { Sequelize } = require("sequelize");
 
 //////////////////////// JWT LOGIC ////////////////////////
 
@@ -463,9 +464,10 @@ exports.requestPasswordChange = catchAsync(async (req, res, next) => {
 exports.resetPassword = catchAsync(async (req, res, next) => {
   const hashedToken = crypto
     .createHash("sha256")
-    .update(req.params.token)
+    .update(req.query.token)
     .digest("hex");
 
+  console.log("BEFORE USER FIND ONE");
   const user = await Users.findOne({
     where: {
       passwordResetToken: hashedToken,
@@ -474,10 +476,14 @@ exports.resetPassword = catchAsync(async (req, res, next) => {
       },
     },
   });
+  console.log("AFTER USER FIND ONE");
+  console.log(`USER: ${user}`);
 
   if (!user) {
     return next(new AppError("Token is invalid or has expired", 400));
   }
+
+  // Should add email logic to send an email on successful password change, so if it wasnt intentional they can take action
 
   user.passwordHash = req.body.password;
   user.passwordResetToken = undefined;
@@ -504,6 +510,8 @@ exports.updatePassword = catchAsync(async (req, res, next) => {
   );
   if (!isCorrect)
     return next(new AppError("Your current password is wrong.", 401));
+
+  // should add email logic to notify that password has changed
 
   user.passwordHash = req.body.password;
   await user.save();

@@ -2,7 +2,7 @@ const jwt = require("jsonwebtoken");
 const { promisify } = require("util");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
-const authController = require("../../../controllers/general/authController");
+const authController = require("./../../../controllers/general/authController");
 const AppError = require("../../../utils/appError");
 const Users = require("../../../models/shared/Users");
 const ClientProfiles = require("../../../models/clients/ClientProfiles");
@@ -783,18 +783,163 @@ describe("Auth API Unit Tests", () => {
   });
 
   // --- ResetPassword Tests ---
-  xit("should call next AppError when passwordResetToken is invalid or expired", async () => {});
+  it("should call next AppError when passwordResetToken is invalid or expired", async () => {
+    const rawToken = "invalidtoken";
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(rawToken)
+      .digest("hex");
 
-  xit("should error when req.body.password is missing", async () => {});
+    const req = {
+      query: { token: rawToken },
+      body: {},
+    };
+    const res = {};
+    const next = jest.fn();
 
-  xit("should successfully reset a users password", async () => {});
+    const findOneSpy = jest.spyOn(Users, "findOne").mockResolvedValue(null);
+
+    await new Promise((resolve) => {
+      authController.resetPassword(req, res, (...args) => {
+        next(...args);
+        resolve();
+      });
+    });
+
+    expect(findOneSpy).toHaveBeenCalledTimes(1);
+    expect(findOneSpy).toHaveBeenCalledWith({
+      where: {
+        passwordResetToken: hashedToken,
+        passwordResetExpires: { [Sequelize.Op.gt]: expect.any(Number) },
+      },
+    });
+
+    expect(next).toHaveBeenCalledWith(expect.any(AppError));
+    const error = next.mock.calls[0][0];
+    expect(error.message).toMatch(/token is invalid or has expired/i);
+
+    findOneSpy.mockRestore();
+  });
+
+  it("should error when req.body.password is missing", async () => {
+    const mockUser = {
+      passwordResetToken: "sometoken",
+      passwordResetExpires: Date.now() + 10000,
+      save: jest.fn(),
+    };
+
+    const req = {
+      params: { token: "resettoken" },
+      body: {},
+    };
+    const res = mockResponse();
+    const next = jest.fn();
+
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update("resettoken")
+      .digest("hex");
+
+    jest.spyOn(Users, "findOne").mockResolvedValue(mockUser);
+
+    await authController.resetPassword(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    const err = next.mock.calls[0][0];
+    expect(err).toBeInstanceOf(Error);
+    Users.findOne.mockRestore();
+  });
+
+  xit("should successfully reset a users password", async () => {
+    // Cant implement yet, email logic not set up
+  });
 
   // --- UpdatePassword Tests ---
-  xit("should call next AppError when req.user is not set", async () => {});
+  it("should call next AppError when req.user is not set", async () => {
+    const req = { user: null }; // or simply {}
+    const res = mockResponse();
+    const next = jest.fn();
 
-  xit("should call next AppError when user.correctPassword is false", async () => {});
+    await authController.updatePassword(req, res, next);
 
-  xit("should send error when req.body.password is missing, might be caught by model validation", async () => {});
+    expect(next).toHaveBeenCalledWith(expect.any(AppError));
+    const err = next.mock.calls[0][0];
+    expect(err.message).toMatch(/user not found/i);
+    expect(err.statusCode).toBe(401);
+  });
 
-  xit("should successfully update password", async () => {});
+  it("should call next AppError when user.correctPassword is false", async () => {
+    const mockUser = {
+      id: 1,
+      correctPassword: jest.fn().mockResolvedValue(false),
+    };
+
+    const req = {
+      user: { id: 1 },
+      body: { passwordCurrent: "wrongpassword" },
+    };
+    const res = mockResponse();
+    const next = jest.fn();
+
+    jest.spyOn(Users, "findByPk").mockResolvedValue(mockUser);
+
+    await new Promise((resolve) => {
+      authController.updatePassword(req, res, (err) => {
+        next(err);
+        resolve(); 
+      });
+    });
+
+    expect(Users.findByPk).toHaveBeenCalledWith(1);
+    expect(mockUser.correctPassword).toHaveBeenCalledWith(
+      "wrongpassword",
+      undefined
+    );
+    expect(next).toHaveBeenCalledWith(expect.any(AppError));
+    const err = next.mock.calls[0][0];
+    expect(err.message).toMatch(/current password is wrong/i);
+    expect(err.statusCode).toBe(401);
+
+    Users.findByPk.mockRestore();
+  });
+
+  it("should send error when req.body.password is missing", async () => {
+    const mockUser = {
+      id: 1,
+      correctPassword: jest.fn().mockResolvedValue(true),
+      save: jest
+        .fn()
+        .mockRejectedValue(
+          new Error("notNull Violation: passwordHash cannot be null")
+        ),
+    };
+
+    const req = {
+      user: { id: 1 },
+      body: {
+        passwordCurrent: "correct-password",
+      },
+    };
+    const res = mockResponse();
+    const next = jest.fn();
+
+    jest.spyOn(Users, "findByPk").mockResolvedValue(mockUser);
+
+    await new Promise((resolve) => {
+      authController.updatePassword(req, res, (err) => {
+        next(err);
+        resolve();
+      });
+    });
+
+    expect(next).toHaveBeenCalledWith(expect.any(Error));
+    const error = next.mock.calls[0][0];
+    expect(error.message).toMatch(/cannot be null/i);
+
+    Users.findByPk.mockRestore();
+  });
+
+  xit("should successfully update password", async () => {
+    // Cant implement yet, email logic not set up
+  });
 });
