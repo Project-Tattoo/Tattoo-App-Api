@@ -1,5 +1,4 @@
 const ArtistProfiles = require("./../../../../models/artists/ArtistProfiles");
-const { mockRequest, mockResponse } = require("./../../../utils/mockExpress");
 
 describe("artistProfiles", () => {
   it("throws error when stylesOffered is not an array", async () => {
