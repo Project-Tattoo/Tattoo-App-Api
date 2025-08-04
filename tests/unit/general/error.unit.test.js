@@ -21,7 +21,7 @@ describe("errorController", () => {
     process.env.NODE_ENV = "staging"; 
 
     const err = new AppError("Something failed", 500);
-
+    
     errorHandler(err, req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(500);

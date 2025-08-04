@@ -27,7 +27,10 @@ module.exports = (err, req, res, next) => {
   err.statusCode = err.statusCode || 500;
   err.status = err.status || "error";
 
-  if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test") {
+  if (
+    process.env.NODE_ENV === "development" ||
+    process.env.NODE_ENV === "test"
+  ) {
     res.status(err.statusCode).json({
       status: err.status,
       error: err,
@@ -57,5 +60,10 @@ module.exports = (err, req, res, next) => {
         message: "Something went very wrong!",
       });
     }
+  } else {
+    res.status(500).json({
+      status: "error",
+      message: "Something went very wrong!",
+    });
   }
 };
