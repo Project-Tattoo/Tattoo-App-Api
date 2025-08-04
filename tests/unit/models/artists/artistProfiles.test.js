@@ -1,6 +1,6 @@
 const ArtistProfiles = require("./../../../../models/artists/ArtistProfiles");
 
-describe("artistProfiles", () => {
+describe("artistProfiles model", () => {
   it("throws error when stylesOffered is not an array", async () => {
     await expect(
       ArtistProfiles.create({

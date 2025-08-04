@@ -1,6 +1,6 @@
 const TattooDesigns = require("./../../../../models/artists/TattooDesigns");
 
-describe("tatooDesigns", () => {
+describe("tatooDesigns model", () => {
   describe("tags custom validator", () => {
     it("should throw if tags is not an array", async () => {
       const invalid = TattooDesigns.build({ tags: "not-an-array" });

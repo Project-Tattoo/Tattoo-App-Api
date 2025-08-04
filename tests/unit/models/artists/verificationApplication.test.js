@@ -1,7 +1,7 @@
 const ArtistProfiles = require("../../../../models/artists/ArtistProfiles");
 const VerificationApplications = require("./../../../../models/artists/VerificationApplications");
 
-describe("verificationApplication", () => {
+describe("verificationApplication model", () => {
   let artist;
 
   beforeAll(async () => {
