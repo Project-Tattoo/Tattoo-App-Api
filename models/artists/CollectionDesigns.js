@@ -1,6 +1,6 @@
 const { DataTypes } = require("sequelize");
 const db = require("./../../server");
-const Collections = require("./Collections");
+const PortfolioCollections = require("./PortfolioCollections");
 const TattooDesigns = require("./TattooDesigns");
 
 const CollectionDesigns = db.define(
@@ -16,7 +16,7 @@ const CollectionDesigns = db.define(
         },
       },
       references: {
-        model: Collections,
+        model: PortfolioCollections,
         key: "id",
       },
       onDelete: "CASCADE",

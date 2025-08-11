@@ -5,15 +5,19 @@ const TOSAgreement = require("./shared/TOSAgreement");
 const ArtistDetails = require("./artists/ArtistDetails");
 const VerificationApplications = require("./artists/VerificationApplications");
 const TattooDesigns = require("./artists/TattooDesigns");
-const Collections = require("./artists/Collections");
+const PortfolioCollections = require("./artists/PortfolioCollections");
 const CollectionDesigns = require("./artists/CollectionDesigns");
 const CommissionListing = require("./artists/CommissionListing");
 const FavoriteDesigns = require("./shared/FavoriteDesigns");
 const FavoriteArtists = require("./shared/FavoriteArtists");
 const CommissionOrders = require("./shared/CommissionOrders");
 const CommissionReviews = require("./shared/CommissionReviews");
+const Notifications = require("./../models/shared/Notifications");
+const CommissionArtworks = require("./../models/shared/CommissionArtworks");
 
 // Shared
+Users.hasMany(Notifications, { foreignKey: "userId" });
+Notifications.belongsTo(Users, { foreignKey: "userId" });
 Users.hasOne(EmailPreference, { foreignKey: "userId" });
 EmailPreference.belongsTo(Users, { foreignKey: "userId" });
 Users.hasMany(TOSAgreement, { foreignKey: "userId" });
@@ -67,6 +71,29 @@ CommissionReviews.belongsTo(Users, {
   targetKey: "id",
 });
 
+CommissionOrders.hasOne(CommissionArtworks, {
+  foreignKey: "commissionOrderId",
+  onDelete: "CASCADE",
+});
+CommissionArtworks.belongsTo(CommissionOrders, {
+  foreignKey: "commissionOrderId",
+});
+
+Users.hasMany(CommissionArtworks, {
+  foreignKey: "providerId",
+  as: "publicArtworks",
+});
+CommissionArtworks.belongsTo(Users, {
+  foreignKey: "providerId",
+  as: "provider",
+});
+
+CommissionReviews.hasOne(CommissionArtworks, {
+  foreignKey: "reviewId",
+  onDelete: "SET NULL",
+});
+CommissionArtworks.belongsTo(CommissionReviews, { foreignKey: "reviewId" });
+
 // Artists
 ArtistDetails.belongsTo(Users, { foreignKey: "userId" });
 Users.hasOne(ArtistDetails, { foreignKey: "userId" });
@@ -74,19 +101,19 @@ ArtistDetails.hasMany(VerificationApplications, { foreignKey: "artistId" });
 VerificationApplications.belongsTo(ArtistDetails, { foreignKey: "artistId" });
 ArtistDetails.hasMany(TattooDesigns, { foreignKey: "artistId" });
 TattooDesigns.belongsTo(ArtistDetails, { foreignKey: "artistId" });
-ArtistDetails.hasMany(Collections, { foreignKey: "artistId" });
-Collections.belongsTo(ArtistDetails, { foreignKey: "artistId" });
-Collections.belongsToMany(TattooDesigns, {
+ArtistDetails.hasMany(PortfolioCollections, { foreignKey: "artistId" });
+PortfolioCollections.belongsTo(ArtistDetails, { foreignKey: "artistId" });
+PortfolioCollections.belongsToMany(TattooDesigns, {
   through: CollectionDesigns,
   foreignKey: "collectionId",
   otherKey: "designId",
   as: "designs",
 });
-TattooDesigns.belongsToMany(Collections, {
+TattooDesigns.belongsToMany(PortfolioCollections, {
   through: CollectionDesigns,
   foreignKey: "designId",
   otherKey: "collectionId",
-  as: "collections",
+  as: "Portfoliocollections",
 });
 ArtistDetails.hasMany(CommissionListing, { foreignKey: "artistId" });
 CommissionListing.belongsTo(ArtistDetails, { foreignKey: "artistId" });
@@ -128,11 +155,13 @@ module.exports = {
   ArtistDetails,
   VerificationApplications,
   TattooDesigns,
-  Collections,
+  PortfolioCollections,
   CollectionDesigns,
   CommissionListing,
   FavoriteDesigns,
   FavoriteArtists,
   CommissionOrders,
   CommissionReviews,
+  Notifications,
+  CommissionArtworks,
 };

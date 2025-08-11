@@ -6,7 +6,7 @@ require('./../models/shared/TOSAgreement');
 require('./../models/artists/ArtistDetails');
 require('./../models/artists/VerificationApplications');
 require('./../models/artists/TattooDesigns');
-require('./../models/artists/Collections');
+require('./../models/artists/PortfolioCollections');
 require('./../models/artists/CollectionDesigns');
 require('./../models/artists/CommissionListing');
 require('./../models/shared/FavoriteDesigns');
@@ -14,6 +14,8 @@ require('./../models/shared/FavoriteArtists');
 require('./../models/shared/CommissionOrders');
 require('./../models/shared/CommissionReviews');
 require('./../models/analytics/SuggestedStyles');
+require('./../models/shared/Notifications')
+require('./../models/shared/CommissionArtworks')
 
 require('./../models/associations'); 
 
