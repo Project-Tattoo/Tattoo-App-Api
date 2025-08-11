@@ -23,31 +23,110 @@ const Users = db.define(
       allowNull: false,
       unique: true,
       validate: {
-        isEmail: { msg: "Must be a valid email address." },
-        notNull: { msg: "Email is required." },
+        isEmail: {
+          msg: "Must be a valid email address.",
+        },
+        notNull: {
+          msg: "Email is required.",
+        },
       },
     },
     passwordHash: {
       type: DataTypes.STRING,
       allowNull: false,
       validate: {
-        notNull: { msg: "Password is required." },
+        notNull: {
+          msg: "Password is required.",
+        },
         len: {
           args: [8, 255],
           msg: "Password must be at least 8 characters long.",
         },
       },
     },
+    stripeCustomerId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      unique: true,
+    },
+    displayName: {
+      type: DataTypes.TEXT,
+      allowNull: false,
+      unique: true,
+      validate: {
+        notNull: {
+          msg: "Must provide a display name",
+        },
+        len: {
+          args: [3, 50],
+          msg: "Display name must be between 3 and 50 characters.",
+        },
+      },
+    },
+    bio: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      validate: {
+        len: {
+          args: [0, 1000],
+          msg: "Bio cannot exceed 1000 characters.",
+        },
+      },
+    },
+    socialMediaLinks: {
+      type: DataTypes.JSONB,
+      allowNull: false,
+      defaultValue: {},
+    },
+    profilePictureUrl: {
+      type: DataTypes.TEXT,
+      allowNull: false,
+      defaultValue: "www.defaultpfp.com",
+      validate: {
+        isUrl: {
+          msg: "Profile picture URL must be a valid URL.",
+        },
+        notNull: {
+          msg: "Profile picture URL is required.",
+        },
+      },
+    },
+    searchVector: {
+      type: DataTypes.TSVECTOR,
+      allowNull: true,
+    },
+    totalViews: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+      allowNull: false,
+      validate: {
+        min: 0,
+        isInt: true,
+      },
+    },
+    totalFollowers: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+      allowNull: false,
+      validate: { min: 0, isInt: true },
+    },
+    lastActivityAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
     passwordChangedAt: DataTypes.DATE,
     passwordResetToken: DataTypes.STRING,
     passwordResetExpires: DataTypes.DATE,
     role: {
-      type: DataTypes.ENUM("artist", "client", "admin"),
+      type: DataTypes.ENUM("artist", "user", "admin"),
       allowNull: false,
+      defaultValue: "user",
       validate: {
-        notNull: { msg: "User role is required." },
+        notNull: {
+          msg: "User role is required.",
+        },
         isIn: {
-          args: [["artist", "client", "admin"]],
+          args: [["artist", "user", "admin"]],
           msg: "Invalid user role. Must be 'artist', 'client', or 'admin'.",
         },
       },
@@ -73,15 +152,49 @@ const Users = db.define(
         fields: ["publicId"],
         name: "users_public_id_unique_idx",
       },
-      { unique: true, fields: ["email"], name: "users_email_unique_idx" },
-      { fields: ["role"], name: "users_role_idx" },
-      { fields: ["isActive"], name: "users_is_active_idx" },
-      { fields: ["verifiedEmail"], name: "users_verified_email_idx" },
+      {
+        unique: true,
+        fields: ["email"],
+        name: "users_email_unique_idx",
+      },
+      {
+        fields: ["role"],
+        name: "users_role_idx",
+      },
+      {
+        fields: ["isActive"],
+        name: "users_is_active_idx",
+      },
+      {
+        fields: ["verifiedEmail"],
+        name: "users_verified_email_idx",
+      },
       {
         fields: ["passwordResetToken"],
         name: "users_password_reset_token_idx",
       },
-      { fields: ["verifyToken"], name: "users_verify_token_idx" },
+      {
+        fields: ["verifyToken"],
+        name: "users_verify_token_idx",
+      },
+      {
+        unique: true,
+        fields: ["displayName"],
+        name: "users_profiles_display_name_unique_idx",
+      },
+      {
+        fields: ["totalViews"],
+        name: "user_profiles_total_views_idx",
+      },
+      {
+        fields: ["lastActivityAt"],
+        name: "user_profiles_last_activity_at_idx",
+      },
+      {
+        fields: ["searchVector"],
+        using: "GIN",
+        name: "users_search_vector_idx",
+      },
     ],
     hooks: {
       beforeSave: async (user) => {

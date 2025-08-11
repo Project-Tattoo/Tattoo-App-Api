@@ -1,19 +1,20 @@
-version: "3.8"
 services:
   db:
     image: postgis/postgis:15-3.3
     container_name: test-tattoo-db
     environment:
-      POSTGRES_USER: test-user
-      POSTGRES_PASSWORD: test-password
-      POSTGRES_DB: test-tattoo-db
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+      POSTGRES_DB: test_tattoo_db
     ports:
-      - "5432:5432"
+      - "5433:5432" 
     volumes:
       - test_pgdata:/var/lib/postgresql/data
   adminer:
     image: adminer
     ports:
-      - "8080:8080"
+      - "8081:8080"
 volumes:
-  test_pgdata: "test-tattoo-db"
+  test_pgdata: 
+    name: test-tattoo-db-volume
+    

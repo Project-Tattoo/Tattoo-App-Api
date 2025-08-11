@@ -1,10 +1,9 @@
 const { DataTypes, Sequelize } = require("sequelize");
 const db = require("./../../server");
 const Users = require("./../shared/Users");
-const VerificationApplications = require("./VerificationApplications");
 
-const ArtistProfiles = db.define(
-  "artistProfiles",
+const ArtistDetails = db.define(
+  "artistDetails",
   {
     userId: {
       type: DataTypes.BIGINT,
@@ -12,7 +11,7 @@ const ArtistProfiles = db.define(
       allowNull: false,
       validate: {
         notNull: {
-          msg: "An profile must be linked to a user account",
+          msg: "An artist profile must be linked to a user account",
         },
       },
       references: {
@@ -20,36 +19,6 @@ const ArtistProfiles = db.define(
         key: "id",
       },
       onDelete: "CASCADE",
-    },
-    publicId: {
-      type: DataTypes.UUID,
-      defaultValue: DataTypes.UUIDV4,
-      unique: true,
-      allowNull: false,
-    },
-    displayName: {
-      type: DataTypes.TEXT,
-      allowNull: false,
-      unique: true,
-      validate: {
-        notNull: {
-          msg: "Must provide a display name",
-        },
-        len: {
-          args: [3, 50],
-          msg: "Display name must be between 3 and 50 characters.",
-        },
-      },
-    },
-    bio: {
-      type: DataTypes.TEXT,
-      allowNull: true,
-      validate: {
-        len: {
-          args: [0, 1000],
-          msg: "Bio cannot exceed 1000 characters.",
-        },
-      },
     },
     commissionStatus: {
       type: DataTypes.ENUM("open", "closed", "byRequest"),
@@ -80,9 +49,11 @@ const ArtistProfiles = db.define(
             }
           }
         },
-        maxItems: {
-          args: [15],
-          msg: "Cannot list more than 15 styles.",
+        maxItemsAllowed(value) {
+          const MAX_STYLES = 15; 
+          if (Array.isArray(value) && value.length > MAX_STYLES) {
+            throw new Error(`Cannot list more than ${MAX_STYLES} styles.`);
+          }
         },
       },
     },
@@ -90,20 +61,6 @@ const ArtistProfiles = db.define(
       type: DataTypes.TEXT,
       allowNull: true,
       unique: true,
-    },
-    socialMediaLinks: {
-      type: DataTypes.JSONB,
-      allowNull: false,
-      defaultValue: {},
-    },
-    profilePictureUrl: {
-      type: DataTypes.TEXT,
-      allowNull: false,
-      defaultValue: "www.defaultpfp.com",
-      validate: {
-        isUrl: { msg: "Profile picture URL must be a valid URL." },
-        notNull: { msg: "Profile picture URL is required." },
-      },
     },
     city: {
       type: DataTypes.STRING,
@@ -227,7 +184,7 @@ const ArtistProfiles = db.define(
       type: DataTypes.BIGINT,
       allowNull: true,
       references: {
-        model: VerificationApplications,
+        model: "verificationApplications",
         key: "id",
       },
     },
@@ -456,24 +413,47 @@ const ArtistProfiles = db.define(
       type: DataTypes.TSVECTOR,
       allowNull: true,
     },
-    totalViews: { 
+    totalReviews: {
       type: DataTypes.INTEGER,
       defaultValue: 0,
       allowNull: false,
-      validate: { min: 0, isInt: true } 
+      validate: { min: 0, isInt: true },
     },
-    totalFollowers: { 
-      type: DataTypes.INTEGER,
-      defaultValue: 0,
-      allowNull: false,
-      validate: { min: 0, isInt: true } 
-    },
-    lastActivityAt: { 
-      type: DataTypes.DATE,
-      allowNull: true,
-    }
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    indexes: [
+      { fields: ["userId"], name: "artist_details_userid_idx" },
+      {
+        fields: ["commissionStatus"],
+        name: "artist_details_commission_status_idx",
+      },
+      { fields: ["isVerified"], name: "artist_details_is_verified_idx" },
+      { fields: ["city", "state"], name: "artist_details_city_state_idx" },
+      {
+        fields: ["stylesOffered"],
+        using: "GIN",
+        name: "artist_details_styles_offered_gin_idx",
+      },
+      {
+        fields: ["totalCommissionsCompleted"],
+        name: "artist_details_total_commissions_completed_idx",
+      },
+      {
+        fields: ["totalRevenueEarned"],
+        name: "artist_details_total_revenue_earned_idx",
+      },
+      { fields: ["averageRating"], name: "artist_details_average_rating_idx" },
+      { fields: ["totalReviews"], name: "artist_details_total_reviews_idx" },
+      {
+        fields: ["searchVector"],
+        using: "GIN",
+        name: "artist_details_search_vector_idx",
+      },
+    ],
+  }
 );
 
-module.exports = ArtistProfiles;
+
+
+module.exports = ArtistDetails;

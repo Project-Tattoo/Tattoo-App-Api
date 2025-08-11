@@ -10,6 +10,7 @@ module.exports = {
     "/Api/config",
     "/Api/tests/setup/",
     "/models/associations.js",
+    "/models/index.js",
     "server.js",
     "app.js",
   ],

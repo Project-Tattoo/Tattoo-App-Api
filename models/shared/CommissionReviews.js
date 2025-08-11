@@ -1,8 +1,7 @@
 const { DataTypes } = require("sequelize");
 const db = require("./../../server");
 const CommissionOrders = require("./CommissionOrders");
-const ArtistProfiles = require("./../artists/ArtistProfiles");
-const ClientProfiles = require("./../clients/ClientProfiles");
+const Users = require("./Users");
 
 const CommissionReviews = db.define(
   "commissionReviews",
@@ -14,7 +13,7 @@ const CommissionReviews = db.define(
       allowNull: false,
     },
     commissionOrderId: {
-      type: DataTypes.UUID,
+      type: DataTypes.BIGINT,
       unique: true,
       allowNull: false,
       validate: {
@@ -26,27 +25,27 @@ const CommissionReviews = db.define(
       },
       onDelete: "CASCADE",
     },
-    artistId: {
+    providerId: {
       type: DataTypes.BIGINT,
       allowNull: false,
       validate: {
-        notNull: { msg: "Review must be linked to an artist." },
+        notNull: { msg: "Review must be linked to a provider." },
       },
       references: {
-        model: ArtistProfiles,
-        key: "userId",
+        model: Users,
+        key: "id",
       },
       onDelete: "CASCADE",
     },
-    clientId: {
+    recipientId: {
       type: DataTypes.BIGINT,
       allowNull: false,
       validate: {
-        notNull: { msg: "Review must be linked to a client." },
+        notNull: { msg: "Review must be linked to a recipient" },
       },
       references: {
-        model: ClientProfiles,
-        key: "userId",
+        model: Users,
+        key: "id",
       },
       onDelete: "SET NULL",
     },
@@ -79,12 +78,11 @@ const CommissionReviews = db.define(
         fields: ["commissionOrderId"],
         name: "commission_reviews_order_id_unique_idx",
       },
-      { fields: ["artistId"], name: "commission_reviews_artist_id_idx" },
-      { fields: ["clientId"], name: "commission_reviews_client_id_idx" },
+      { fields: ["providerId"], name: "commission_reviews_provider_id_idx" },
+      { fields: ["recipientId"], name: "commission_reviews_recipient_id_idx" },
       { fields: ["rating"], name: "commission_reviews_rating_idx" },
       { fields: ["createdAt"], name: "commission_reviews_created_at_idx" },
     ],
   }
 );
-
 module.exports = CommissionReviews;

@@ -5,16 +5,17 @@
   "main": "index.js",
   "scripts": {
     "docker-test:up": "docker compose -f docker/docker-test-compose.yml up -d",
-    "docker-test:down": "docker compose -f docker/docker-test-compose.yml down",
-    "test": "NODE_ENV=test npm run docker-test:up && npm run wait && jest",
-    "start" : "node app.js",
-    "dev": "nodemon app.js",
+    "docker-test:down": "docker compose -f docker/docker-test-compose.yml down --volumes",
+    "test": "cross-env NODE_ENV=test npm run docker-test:up && cross-env NODE_ENV=test npm run wait && cross-env NODE_ENV=test jest --forceExit",
+    "start": "node --trace-warnings start.js",
+    "dev": "nodemon --trace-warnings start.js",
     "docker:up": "docker compose -f docker/docker-compose.yml up -d",
-    "docker:down": "docker compose -f docker/docker-compose.yml down",
-    "sync": "node utils/syncModels.js",
-    "seed": "node seed/seedLocalDb.js",
+    "docker:down": "docker compose -f docker/docker-compose.yml down --volumes",
+    "migrate": "npx sequelize-cli db:migrate",
+    "migrate:undo": "npx sequelize-cli db:migrate:undo",
+    "migrate:undo:all": "npx sequelize-cli db:migrate:undo:all",
     "wait": "node utils/waitForDb.js",
-    "launch": "npm run docker:up && npm run wait && npm run sync && npm run seed && npm run dev"
+    "launch": "npm run docker:up && npm run wait && npm run migrate && npm run dev"
   },
   "repository": {
     "type": "git",
@@ -31,6 +32,7 @@
     "axios": "^1.10.0",
     "bcryptjs": "^3.0.2",
     "body-parser": "^2.2.0",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "debug": "^4.4.1",
     "dotenv": "^17.2.0",
@@ -38,9 +40,11 @@
     "express-rate-limit": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
     "moment": "^2.30.1",
+    "morgan": "^1.10.1",
     "node-cron": "^4.2.1",
     "pg": "^8.16.3",
     "pug": "^3.0.3",
+    "redis": "^5.6.0",
     "sequelize": "^6.37.7",
     "stripe": "^18.3.0",
     "uuid": "^11.1.0",
@@ -48,7 +52,11 @@
     "xss-clean": "^0.1.4"
   },
   "devDependencies": {
+    "@testing-library/react": "^16.3.0",
+    "cross-env": "^10.0.0",
     "jest": "^30.0.4",
+    "nodemon": "^3.1.10",
+    "sequelize-cli": "^6.6.3",
     "sequelize-mock": "^0.10.2",
     "supertest": "^7.1.3"
   }
