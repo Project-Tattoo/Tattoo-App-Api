@@ -1,14 +1,12 @@
-const ArtistProfiles = require("./../../../../models/artists/ArtistProfiles");
+const ArtistDetails = require("./../../../../models/artists/ArtistDetails");
 
-describe("artistProfiles model", () => {
+describe("artistDetails model", () => {
   it("throws error when stylesOffered is not an array", async () => {
     await expect(
-      ArtistProfiles.create({
+      ArtistDetails.create({
         userId: 1,
-        displayName: "CoolArtist",
         commissionStatus: "open",
         stylesOffered: "not-an-array",
-        profilePictureUrl: "https://valid.url",
         city: "Seattle",
         state: "WA",
         zipcode: "98101",
@@ -19,12 +17,10 @@ describe("artistProfiles model", () => {
 
   it("throws error when stylesOffered has empty or non-string items", async () => {
     await expect(
-      ArtistProfiles.create({
+      ArtistDetails.create({
         userId: 2,
-        displayName: "AnotherArtist",
         commissionStatus: "open",
         stylesOffered: ["", 123, " "],
-        profilePictureUrl: "https://valid.url",
         city: "Austin",
         state: "TX",
         zipcode: "73301",
@@ -37,12 +33,10 @@ describe("artistProfiles model", () => {
     const tooManyStyles = Array.from({ length: 16 }, (_, i) => `Style${i}`);
 
     await expect(
-      ArtistProfiles.create({
+      ArtistDetails.create({
         userId: 3,
-        displayName: "OverflowArtist",
         commissionStatus: "open",
         stylesOffered: tooManyStyles, // 🚫 >15
-        profilePictureUrl: "https://valid.url",
         city: "Denver",
         state: "CO",
         zipcode: "80014",
@@ -52,7 +46,7 @@ describe("artistProfiles model", () => {
   });
 
   it("location setter uses ST_SetSRID with lng/lat", () => {
-    const instance = ArtistProfiles.build();
+    const instance = ArtistDetails.build();
 
     instance.setDataValue = jest.fn();
 
@@ -67,7 +61,7 @@ describe("artistProfiles model", () => {
   });
 
   test("location getter returns coordinates if location is set", () => {
-    const instance = ArtistProfiles.build();
+    const instance = ArtistDetails.build();
     instance.getDataValue = jest.fn().mockReturnValue({
       coordinates: [-122.33, 47.61],
     });
@@ -77,7 +71,7 @@ describe("artistProfiles model", () => {
   });
 
   test("location getter returns null if location is not set", () => {
-    const instance = ArtistProfiles.build();
+    const instance = ArtistDetails.build();
     instance.getDataValue = jest.fn().mockReturnValue(null);
 
     const coords = instance.location;

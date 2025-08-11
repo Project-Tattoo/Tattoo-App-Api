@@ -6,7 +6,8 @@ describe("users model", () => {
       const user = await Users.create({
         email: "static@example.com",
         passwordHash: "unchanged-password",
-        role: "client",
+        role: "user",
+        displayName:"passwordhashuser"
       });
 
       const originalHash = user.passwordHash;

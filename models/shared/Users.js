@@ -104,6 +104,12 @@ const Users = db.define(
         isInt: true,
       },
     },
+    totalFollowers: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+      allowNull: false,
+      validate: { min: 0, isInt: true },
+    },
     lastActivityAt: {
       type: DataTypes.DATE,
       allowNull: true,

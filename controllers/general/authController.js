@@ -6,8 +6,7 @@ const AppError = require("./../../utils/appError");
 const Users = require("./../../models/shared/Users");
 const EmailPreference = require("./../../models/shared/EmailPreferences");
 const TOSAgreement = require("./../../models/shared/TOSAgreement");
-const ArtistProfiles = require("./../../models/artists/ArtistProfiles");
-const ClientProfiles = require("./../../models/clients/ClientProfiles");
+const ArtistDetails = require("./../../models/artists/ArtistDetails");
 const db = require("./../../server");
 const { Sequelize } = require("sequelize");
 
@@ -240,7 +239,7 @@ exports.signup = catchAsync(async (req, res, next) => {
   if (role === "artist" && (!city || !state || !zipcode)) {
     return next(
       new AppError(
-        "Please provide display name, city, state, and zipcode for artist registration.",
+        "Please provide city, state, and zipcode for artist registration.",
         400
       )
     );

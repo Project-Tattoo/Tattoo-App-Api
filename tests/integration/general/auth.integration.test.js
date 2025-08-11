@@ -4,8 +4,7 @@ const app = require("./../../../app");
 const Users = require("../../../models/shared/Users");
 const EmailPreference = require("../../../models/shared/EmailPreferences");
 const TOSAgreement = require("../../../models/shared/TOSAgreement");
-const ArtistProfiles = require("../../../models/artists/ArtistProfiles");
-const ClientProfiles = require("../../../models/clients/ClientProfiles");
+const ArtistDetails = require("../../../models/artists/ArtistDetails");
 
 require("dotenv").config({ path: "./.env.test" });
 
@@ -19,37 +18,37 @@ describe("Auth API Integration Tests", () => {
   });
 
   describe("Signup", () => {
-    it("should register a new client user successfully", async () => {
+    it("should register a new user successfully", async () => {
       const res = await request(app).post("/api/v1/auth/signup").send({
         email: "testclient@example.com",
         password: "password123",
         passwordConfirm: "password123",
-        role: "client",
-        displayName: "Test Client User",
-        bio: "A client interested in tattoos.",
+        role: "user",
+        displayName: "Test User",
+        bio: "A user interested in tattoos.",
       });
 
       expect(res.statusCode).toEqual(201);
       expect(res.body.status).toEqual("success");
       expect(res.body.token).toBeDefined();
       expect(res.body.data.user.email).toEqual("testclient@example.com");
-      expect(res.body.data.user.role).toEqual("client");
+      expect(res.body.data.user.role).toEqual("user");
       expect(res.body.data.user.publicId).toBeDefined();
 
       const userInDb = await Users.findOne({
         where: { email: "testclient@example.com" },
       });
       expect(userInDb).toBeDefined();
-      expect(userInDb.role).toEqual("client");
+      expect(userInDb.role).toEqual("user");
       expect(userInDb.isActive).toBe(true);
       expect(userInDb.publicId).toBeDefined();
 
-      const clientProfileInDb = await ClientProfiles.findOne({
-        where: { userId: userInDb.id },
+      const userProfileInDb = await Users.findOne({
+        where: { id: userInDb.id },
       });
-      expect(clientProfileInDb).toBeDefined();
-      expect(clientProfileInDb.displayName).toEqual("Test Client User");
-      expect(clientProfileInDb.publicId).toBeDefined();
+      expect(userProfileInDb).toBeDefined();
+      expect(userProfileInDb.displayName).toEqual("Test User");
+      expect(userProfileInDb.publicId).toBeDefined();
 
       const emailPrefInDb = await EmailPreference.findOne({
         where: { userId: userInDb.id },
@@ -73,12 +72,11 @@ describe("Auth API Integration Tests", () => {
           password: "artistpassword123",
           passwordConfirm: "artistpassword123",
           role: "artist",
-          displayName: "Artist A",
-          bio: "Specializing in traditional tattoos.",
           city: "New York",
           state: "NY",
           zipcode: "10001",
           stylesOffered: ["Traditional", "Realism"],
+          displayName:"newArtist"
         });
 
       expect(res.statusCode).toEqual(201);
@@ -94,17 +92,15 @@ describe("Auth API Integration Tests", () => {
       expect(userInDb).toBeDefined();
       expect(userInDb.role).toEqual("artist");
 
-      const artistProfileInDb = await ArtistProfiles.findOne({
+      const artistProfileInDb = await ArtistDetails.findOne({
         where: { userId: userInDb.id },
       });
       expect(artistProfileInDb).toBeDefined();
-      expect(artistProfileInDb.displayName).toEqual("Artist A");
       expect(artistProfileInDb.city).toEqual("New York");
       expect(artistProfileInDb.stylesOffered).toEqual([
         "Traditional",
         "Realism",
       ]);
-      expect(artistProfileInDb.publicId).toBeDefined();
     });
 
     it("should prevent registration with an existing email", async () => {
@@ -112,7 +108,7 @@ describe("Auth API Integration Tests", () => {
         email: "duplicate@example.com",
         password: "testpass123",
         passwordConfirm: "testpass123",
-        role: "client",
+        role: "user",
         displayName: "User One",
         bio: "First user",
       };
@@ -146,7 +142,7 @@ describe("Auth API Integration Tests", () => {
         email: "mismatch@example.com",
         password: "password123",
         passwordConfirm: "differentPassword123",
-        role: "client",
+        role: "user",
         displayName: "Mismatch Test",
         bio: "Mismatch test",
       });
@@ -191,13 +187,12 @@ describe("Auth API Integration Tests", () => {
         password: "password123",
         passwordConfirm: "password123",
         role: "artist",
-        displayName: "Missing Artist",
-        bio: "Testing artist flow",
+        displayName:"artistregistration"
       });
 
       expect(res.statusCode).toBe(400);
       expect(res.body.message).toMatch(
-        /Please provide display name, city, state, and zipcode for artist registration./i
+        /Please provide city, state, and zipcode for artist registration./i
       );
     });
   });
@@ -208,7 +203,7 @@ describe("Auth API Integration Tests", () => {
         email: "logintest@example.com",
         password: "testpass123",
         passwordConfirm: "testpass123",
-        role: "client",
+        role: "user",
         displayName: "Login Test User",
         bio: "Test bio",
       });
@@ -231,7 +226,7 @@ describe("Auth API Integration Tests", () => {
         email: "wrongpass@example.com",
         password: "correctpassword123",
         passwordConfirm: "correctpassword123",
-        role: "client",
+        role: "user",
         displayName: "Test User",
         bio: "Just testing.",
       });

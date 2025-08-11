@@ -1,6 +1,6 @@
 const { DataTypes } = require("sequelize");
 const db = require("./../../server");
-const ArtistProfiles = require("./ArtistProfiles");
+const ArtistDetails = require("./ArtistDetails");
 
 const CommissionListing = db.define(
   "commissionListings",
@@ -20,7 +20,7 @@ const CommissionListing = db.define(
         },
       },
       references: {
-        model: ArtistProfiles,
+        model: ArtistDetails,
         key: "userId",
       },
       onDelete: "CASCADE",

@@ -9,7 +9,7 @@ const Collections = require("./artists/Collections");
 const CollectionDesigns = require("./artists/CollectionDesigns");
 const CommissionListing = require("./artists/CommissionListing");
 const FavoriteDesigns = require("./shared/FavoriteDesigns");
-const FavoriteArtists = require("./shared/ClientFavoriteArtists");
+const FavoriteArtists = require("./shared/FavoriteArtists");
 const CommissionOrders = require("./shared/CommissionOrders");
 const CommissionReviews = require("./shared/CommissionReviews");
 
@@ -96,7 +96,7 @@ Users.belongsToMany(TattooDesigns, {
   through: FavoriteDesigns,
   foreignKey: "userId",
   otherKey: "designId",
-  as: "favoriteDesigns",
+  as: "usersFavoritedDesigns",
 });
 
 TattooDesigns.belongsToMany(Users, {
@@ -110,7 +110,7 @@ Users.belongsToMany(ArtistDetails, {
   through: FavoriteArtists,
   foreignKey: "userId",
   otherKey: "artistId",
-  as: "favoriteArtists",
+  as: "usersFavoritedArtists",
 });
 
 ArtistDetails.belongsToMany(Users, {

@@ -1,16 +1,14 @@
-const ArtistProfiles = require("../../../../models/artists/ArtistProfiles");
+const ArtistDetails = require("../../../../models/artists/ArtistDetails");
 const VerificationApplications = require("./../../../../models/artists/VerificationApplications");
 
 describe("verificationApplication model", () => {
   let artist;
 
   beforeAll(async () => {
-    artist = await ArtistProfiles.create({
+    artist = await ArtistDetails.create({
       userId: 12345,
-      displayName: "Valid Artist",
       commissionStatus: "open",
       stylesOffered: ["blackwork", "neotraditional"],
-      profilePictureUrl: "https://example.com/pic.jpg",
       city: "San Francisco",
       state: "CA",
       zipcode: "94103",
@@ -22,7 +20,7 @@ describe("verificationApplication model", () => {
     await VerificationApplications.destroy({
       where: { artistId: artist.userId },
     });
-    await ArtistProfiles.destroy({ where: { userId: artist.userId } });
+    await ArtistDetails.destroy({ where: { userId: artist.userId } });
   });
 
   it("throws error when supportingDocuments is not a valid URL array", async () => {

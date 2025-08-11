@@ -3,6 +3,18 @@ const { DataTypes } = require("sequelize");
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
+    await queryInterface.sequelize.query(
+      "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
+    );
+
+    await queryInterface.sequelize.query(`
+      CREATE OR REPLACE FUNCTION immutable_array_to_tsvector(config regconfig, arr text[])
+      RETURNS tsvector LANGUAGE plpgsql IMMUTABLE AS $$
+      BEGIN
+        RETURN to_tsvector(config, coalesce(array_to_string(arr, ' '), ''));
+      END;
+      $$;
+    `);
 
     ////////////////////////// USERS //////////////////////////
     await queryInterface.createTable("users", {
@@ -31,6 +43,11 @@ module.exports = {
       },
       searchVector: { type: DataTypes.TSVECTOR, allowNull: true },
       totalViews: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0,
+        allowNull: false,
+      },
+      totalFollowers: {
         type: DataTypes.INTEGER,
         defaultValue: 0,
         allowNull: false,
@@ -92,20 +109,21 @@ module.exports = {
     await queryInterface.addIndex("users", ["lastActivityAt"], {
       name: "user_profiles_last_activity_at_idx",
     });
-    await queryInterface.addIndex("users", ["searchVector"], {
-      using: "GIN",
-      name: "users_search_vector_idx",
-    });
 
     await queryInterface.sequelize.query(`
       ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "searchVector" TSVECTOR
         GENERATED ALWAYS AS (
           setweight(to_tsvector('english'::regconfig, coalesce("displayName", '')), 'A') ||
-          setweight(to_tsvector('english'::regconfig, coalesce("bio", '')), 'B') ||
+          setweight(to_tsvector('english'::regconfig, coalesce("bio", '')), 'B')
         ) STORED;
     `);
 
-    // 2. Create EmailPreferences Table
+    await queryInterface.addIndex("users", ["searchVector"], {
+      using: "GIN",
+      name: "users_search_vector_idx",
+    });
+
+    ////////////////////////// EMAILPREFERENCES //////////////////////////
     await queryInterface.createTable("emailPreferences", {
       userId: {
         type: DataTypes.BIGINT,
@@ -128,7 +146,11 @@ module.exports = {
       updatedAt: { type: DataTypes.DATE, allowNull: false },
     });
 
-    // 3. Create TOSAgreements Table
+    await queryInterface.addIndex("emailPreferences", ["userId"], {
+      name: "email_preferences_userid_idx",
+    });
+
+    ////////////////////////// TOSAGREEMENTS //////////////////////////
     await queryInterface.createTable("tosAgreements", {
       id: {
         type: DataTypes.BIGINT,
@@ -154,8 +176,18 @@ module.exports = {
       name: "unique_user_tos_version",
     });
 
-    // 4. Create ArtistProfiles Table
-    await queryInterface.createTable("artistProfiles", {
+    await queryInterface.addIndex("tosAgreements", ["userId"], {
+      name: "tos_agreements_userid_idx",
+    });
+    await queryInterface.addIndex("tosAgreements", ["tosVersion"], {
+      name: "tos_agreements_tos_version_idx",
+    });
+    await queryInterface.addIndex("tosAgreements", ["agreedAt"], {
+      name: "tos_agreements_agreed_at_idx",
+    });
+
+    ////////////////////////// ARTISTDETAILS //////////////////////////
+    await queryInterface.createTable("artistDetails", {
       userId: {
         type: DataTypes.BIGINT,
         primaryKey: true,
@@ -163,14 +195,6 @@ module.exports = {
         references: { model: "users", key: "id" },
         onDelete: "CASCADE",
       },
-      publicId: {
-        type: DataTypes.UUID,
-        defaultValue: DataTypes.UUIDV4,
-        unique: true,
-        allowNull: false,
-      },
-      displayName: { type: DataTypes.TEXT, unique: true, allowNull: false },
-      bio: { type: DataTypes.TEXT, allowNull: true },
       commissionStatus: {
         type: DataTypes.ENUM("open", "closed", "byRequest"),
         allowNull: false,
@@ -185,16 +209,7 @@ module.exports = {
         type: DataTypes.TEXT,
         allowNull: true,
         unique: true,
-      },
-      socialMediaLinks: {
-        type: DataTypes.JSONB,
-        allowNull: false,
-        defaultValue: {},
-      },
-      profilePictureUrl: {
-        type: DataTypes.TEXT,
-        allowNull: false,
-        defaultValue: "www.defaultpfp.com",
+        ltValue: "www.defaultpfp.com",
       },
       city: { type: DataTypes.STRING, allowNull: false },
       state: { type: DataTypes.STRING, allowNull: false },
@@ -230,22 +245,57 @@ module.exports = {
         defaultValue: 0,
         allowNull: false,
       },
-      totalViews: {
-        type: DataTypes.INTEGER,
-        defaultValue: 0,
-        allowNull: false,
-      },
-      totalFollowers: {
-        type: DataTypes.INTEGER,
-        defaultValue: 0,
-        allowNull: false,
-      },
-      lastActivityAt: { type: DataTypes.DATE, allowNull: true },
+      searchVector: { type: DataTypes.TSVECTOR, allowNull: true },
       createdAt: { type: DataTypes.DATE, allowNull: false },
       updatedAt: { type: DataTypes.DATE, allowNull: false },
     });
 
-    // 5. Create VerificationApplications Table
+    await queryInterface.addIndex("artistDetails", ["userId"], {
+      name: "artist_details_userid_idx",
+    });
+    await queryInterface.addIndex("artistDetails", ["commissionStatus"], {
+      name: "artist_details_commission_status_idx",
+    });
+    await queryInterface.addIndex("artistDetails", ["isVerified"], {
+      name: "artist_details_is_verified_idx",
+    });
+    await queryInterface.addIndex("artistDetails", ["city", "state"], {
+      name: "artist_details_city_state_idx",
+    });
+    await queryInterface.addIndex("artistDetails", ["stylesOffered"], {
+      using: "GIN",
+      name: "artist_details_styles_offered_gin_idx",
+    });
+    await queryInterface.addIndex(
+      "artistDetails",
+      ["totalCommissionsCompleted"],
+      { name: "artist_details_total_commissions_completed_idx" }
+    );
+    await queryInterface.addIndex("artistDetails", ["totalRevenueEarned"], {
+      name: "artist_Details_total_revenue_earned_idx",
+    });
+    await queryInterface.addIndex("artistDetails", ["averageRating"], {
+      name: "artist_details_average_rating_idx",
+    });
+    await queryInterface.addIndex("artistDetails", ["totalReviews"], {
+      name: "artist_details_total_reviews_idx",
+    });
+    await queryInterface.addIndex("artistDetails", ["searchVector"], {
+      using: "GIN",
+      name: "artist_details_search_vector_idx",
+    });
+
+    await queryInterface.sequelize.query(`
+      ALTER TABLE "artistDetails" ADD COLUMN IF NOT EXISTS "searchVector" TSVECTOR
+        GENERATED ALWAYS AS (
+          setweight(to_tsvector('english', coalesce(NEW."city", '')), 'A') ||
+          setweight(to_tsvector('english', coalesce(NEW."state", '')), 'A') ||
+          setweight(to_tsvector('english', array_to_string(NEW."stylesOffered", ' ')), 'B') ||
+          setweight(to_tsvector('english', coalesce(NEW."averageRating"::text, '')), 'C')
+        ) STORED;
+    `);
+
+    ////////////////////////// VERIFICATIONAPPLICATIONS //////////////////////////
     await queryInterface.createTable("verificationApplications", {
       id: {
         type: DataTypes.BIGINT,
@@ -256,7 +306,7 @@ module.exports = {
       artistId: {
         type: DataTypes.BIGINT,
         allowNull: false,
-        references: { model: "artistProfiles", key: "userId" },
+        references: { model: "artistDetails", key: "userId" },
         onDelete: "CASCADE",
       },
       submittedAt: {
@@ -280,8 +330,9 @@ module.exports = {
       createdAt: { type: DataTypes.DATE, allowNull: false },
       updatedAt: { type: DataTypes.DATE, allowNull: false },
     });
+
     await queryInterface.addColumn(
-      "artistProfiles",
+      "artistDetails",
       "currentVerificationApplicationId",
       {
         type: DataTypes.BIGINT,
@@ -291,7 +342,20 @@ module.exports = {
       }
     );
 
-    // 6. Create TattooDesigns Table
+    await queryInterface.addIndex("verificationApplications", ["artistId"], {
+      name: "verification_applications_artist_id_idx",
+    });
+    await queryInterface.addIndex("verificationApplications", ["status"], {
+      name: "verification_applications_status_idx",
+    });
+    await queryInterface.addIndex("verificationApplications", ["submittedAt"], {
+      name: "verification_applications_submitted_at_idx",
+    });
+    await queryInterface.addIndex("verificationApplications", ["reviewedAt"], {
+      name: "verification_applications_reviewed_at_idx",
+    });
+
+    ////////////////////////// TATTOODESIGNS //////////////////////////
     await queryInterface.createTable("tattooDesigns", {
       id: {
         type: DataTypes.BIGINT,
@@ -308,7 +372,7 @@ module.exports = {
       artistId: {
         type: DataTypes.BIGINT,
         allowNull: false,
-        references: { model: "artistProfiles", key: "userId" },
+        references: { model: "artistDetails", key: "userId" },
         onDelete: "CASCADE",
       },
       title: { type: DataTypes.TEXT, allowNull: false },
@@ -340,7 +404,45 @@ module.exports = {
       updatedAt: { type: DataTypes.DATE, allowNull: false },
     });
 
-    // 7. Create Collections Table
+    await queryInterface.addIndex("tattooDesigns", ["publicId"], {
+      unique: true,
+      name: "tattoo_designs_public_id_unique_idx",
+    });
+    await queryInterface.addIndex("tattooDesigns", ["artistId"], {
+      name: "tattoo_designs_artist_id_idx",
+    });
+    await queryInterface.addIndex("tattooDesigns", ["style"], {
+      name: "tattoo_designs_style_idx",
+    });
+    await queryInterface.addIndex("tattooDesigns", ["totalViews"], {
+      name: "tattoo_designs_total_views_idx",
+    });
+    await queryInterface.addIndex("tattooDesigns", ["totalFavorites"], {
+      name: "tattoo_designs_total_favorites_idx",
+    });
+    await queryInterface.addIndex("tattooDesigns", ["totalShares"], {
+      name: "tattoo_designs_total_shares_idx",
+    });
+    await queryInterface.addIndex("tattooDesigns", ["createdAt"], {
+      name: "tattoo_designs_created_at_idx",
+    });
+
+    await queryInterface.sequelize.query(`
+      ALTER TABLE "tattooDesigns" ADD COLUMN IF NOT EXISTS "searchVector" TSVECTOR
+        GENERATED ALWAYS AS (
+          setweight(to_tsvector('english'::regconfig, coalesce("title", '')), 'A') ||
+          setweight(to_tsvector('english'::regconfig, coalesce("description", '')), 'B') ||
+          setweight(immutable_array_to_tsvector('english'::regconfig, "tags"), 'C') || -- CRITICAL CHANGE: Using immutable_array_to_tsvector
+          setweight(to_tsvector('english'::regconfig, coalesce("style", '')), 'B')
+        ) STORED;
+    `);
+
+    await queryInterface.addIndex("tattooDesigns", ["searchVector"], {
+      using: "GIN",
+      name: "tattoo_designs_search_vector_idx",
+    });
+
+    ////////////////////////// COLLECTIONS //////////////////////////
     await queryInterface.createTable("collections", {
       id: {
         type: DataTypes.BIGINT,
@@ -357,7 +459,7 @@ module.exports = {
       artistId: {
         type: DataTypes.BIGINT,
         allowNull: false,
-        references: { model: "artistProfiles", key: "userId" },
+        references: { model: "artistDetails", key: "userId" },
         onDelete: "CASCADE",
       },
       name: { type: DataTypes.TEXT, allowNull: false },
@@ -371,7 +473,24 @@ module.exports = {
       updatedAt: { type: DataTypes.DATE, allowNull: false },
     });
 
-    // 8. Create CollectionDesigns Junction Table
+    await queryInterface.addIndex("collections", ["publicId"], {
+      unique: true,
+      name: "collections_public_id_unique_idx",
+    });
+    await queryInterface.addIndex("collections", ["artistId"], {
+      name: "collections_artist_id_idx",
+    });
+    await queryInterface.addIndex("collections", ["name"], {
+      name: "collections_name_idx",
+    });
+    await queryInterface.addIndex("collections", ["totalViews"], {
+      name: "collections_total_views_idx",
+    });
+    await queryInterface.addIndex("collections", ["createdAt"], {
+      name: "collections_created_at_idx",
+    });
+
+    ////////////////////////// COLLECTIONDESIGNS //////////////////////////
     await queryInterface.createTable("collectionDesigns", {
       collectionId: {
         type: DataTypes.BIGINT,
@@ -391,7 +510,14 @@ module.exports = {
       updatedAt: { type: DataTypes.DATE, allowNull: false },
     });
 
-    // 9. Create CommissionListings Table
+    await queryInterface.addIndex("collectionDesigns", ["collectionId"], {
+      name: "collection_designs_collection_id_idx",
+    });
+    await queryInterface.addIndex("collectionDesigns", ["designId"], {
+      name: "collection_designs_design_id_idx",
+    });
+
+    ////////////////////////// COLLECTIONLISTINGS //////////////////////////
     await queryInterface.createTable("commissionListings", {
       id: {
         type: DataTypes.BIGINT,
@@ -408,7 +534,7 @@ module.exports = {
       artistId: {
         type: DataTypes.BIGINT,
         allowNull: false,
-        references: { model: "artistProfiles", key: "userId" },
+        references: { model: "artistDetails", key: "userId" },
         onDelete: "CASCADE",
       },
       image: {
@@ -445,45 +571,36 @@ module.exports = {
       updatedAt: { type: DataTypes.DATE, allowNull: false },
     });
 
-    // 10. Create ClientProfiles Table
-    await queryInterface.createTable("clientProfiles", {
+    await queryInterface.addIndex("commissionListings", ["publicId"], {
+      unique: true,
+      name: "commission_listings_public_id_unique_idx",
+    });
+    await queryInterface.addIndex("commissionListings", ["artistId"], {
+      name: "commission_listings_artist_id_idx",
+    });
+    await queryInterface.addIndex("commissionListings", ["isActive"], {
+      name: "commission_listings_is_active_idx",
+    });
+    await queryInterface.addIndex("commissionListings", ["basePrice"], {
+      name: "commission_listings_base_price_idx",
+    });
+    await queryInterface.addIndex("commissionListings", ["totalViews"], {
+      name: "commission_listings_total_views_idx",
+    });
+    await queryInterface.addIndex("commissionListings", ["totalInquiries"], {
+      name: "commission_listings_total_inquiries_idx",
+    });
+    await queryInterface.addIndex("commissionListings", ["createdAt"], {
+      name: "commission_listings_created_at_idx",
+    });
+
+    ////////////////////////// FAVORITEDESIGNS //////////////////////////
+    await queryInterface.createTable("favoriteDesigns", {
       userId: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         allowNull: false,
         references: { model: "users", key: "id" },
-        onDelete: "CASCADE",
-      },
-      publicId: {
-        type: DataTypes.UUID,
-        defaultValue: DataTypes.UUIDV4,
-        unique: true,
-        allowNull: false,
-      },
-      displayName: { type: DataTypes.TEXT, allowNull: true },
-      bio: { type: DataTypes.TEXT, allowNull: true },
-      stripeCustomerId: {
-        type: DataTypes.STRING,
-        allowNull: true,
-        unique: true,
-      },
-      totalViews: {
-        type: DataTypes.INTEGER,
-        defaultValue: 0,
-        allowNull: false,
-      },
-      lastActivityAt: { type: DataTypes.DATE, allowNull: true },
-      createdAt: { type: DataTypes.DATE, allowNull: false },
-      updatedAt: { type: DataTypes.DATE, allowNull: false },
-    });
-
-    // 11. Create ClientFavoriteDesigns Junction Table
-    await queryInterface.createTable("clientFavoriteDesigns", {
-      clientId: {
-        type: DataTypes.BIGINT,
-        primaryKey: true,
-        allowNull: false,
-        references: { model: "clientProfiles", key: "userId" },
         onDelete: "CASCADE",
       },
       designId: {
@@ -501,21 +618,33 @@ module.exports = {
       createdAt: { type: DataTypes.DATE, allowNull: false },
       updatedAt: { type: DataTypes.DATE, allowNull: false },
     });
+    await queryInterface.addIndex("favoriteDesigns", ["userId", "designId"], {
+      name: "unique_user_design_favorite",
+    });
+    await queryInterface.addIndex("favoriteDesigns", ["userId"], {
+      name: "idx_user_favorite_designs_by_id",
+    });
+    await queryInterface.addIndex("favoriteDesigns", ["designId"], {
+      name: "idx_user_favorite_designs_by_design_id",
+    });
+    await queryInterface.addIndex("favoriteDesigns", ["favoritedAt"], {
+      name: "user_favorite_designs_favorited_at_idx",
+    });
 
-    // 12. Create ClientFavoriteArtists Junction Table
-    await queryInterface.createTable("clientFavoriteArtists", {
-      clientId: {
+    ////////////////////////// FAVORITEARTISTS //////////////////////////
+    await queryInterface.createTable("favoriteArtists", {
+      userId: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         allowNull: false,
-        references: { model: "clientProfiles", key: "userId" },
+        references: { model: "users", key: "id" },
         onDelete: "CASCADE",
       },
       artistId: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         allowNull: false,
-        references: { model: "artistProfiles", key: "userId" },
+        references: { model: "users", key: "id" },
         onDelete: "CASCADE",
       },
       favoritedAt: {
@@ -526,8 +655,20 @@ module.exports = {
       createdAt: { type: DataTypes.DATE, allowNull: false },
       updatedAt: { type: DataTypes.DATE, allowNull: false },
     });
+    await queryInterface.addIndex("favoriteArtists", ["userId", "artistId"], {
+      name: "unique_user_artist_favorite",
+    });
+    await queryInterface.addIndex("favoriteArtists", ["userId"], {
+      name: "favorite_artists_users_id_idx",
+    });
+    await queryInterface.addIndex("favoriteArtists", ["artistId"], {
+      name: "user_favorite_artists_artist_id_idx",
+    });
+    await queryInterface.addIndex("favoriteArtists", ["favoritedAt"], {
+      name: "users_favorite_artists_favorited_at_idx",
+    });
 
-    // 13. Create CommissionOrders Table
+    ////////////////////////// COMMISSIONORDERS //////////////////////////
     await queryInterface.createTable("commissionOrders", {
       id: {
         type: DataTypes.BIGINT,
@@ -541,16 +682,16 @@ module.exports = {
         references: { model: "commissionListings", key: "id" },
         onDelete: "SET NULL",
       },
-      artistId: {
+      providerId: {
         type: DataTypes.BIGINT,
         allowNull: false,
-        references: { model: "artistProfiles", key: "userId" },
+        references: { model: "users", key: "id" },
         onDelete: "CASCADE",
       },
-      clientId: {
+      recipientId: {
         type: DataTypes.BIGINT,
         allowNull: false,
-        references: { model: "clientProfiles", key: "userId" },
+        references: { model: "users", key: "id" },
         onDelete: "CASCADE",
       },
       agreedPrice: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
@@ -569,10 +710,10 @@ module.exports = {
         allowNull: false,
         defaultValue: "pending_artist_acceptance",
       },
-      clientRequestDetails: { type: DataTypes.TEXT, allowNull: false },
-      artistSubmissionUrl: { type: DataTypes.TEXT, allowNull: true },
-      artistSubmissionDate: { type: DataTypes.DATE, allowNull: true },
-      clientConfirmationDate: { type: DataTypes.DATE, allowNull: true },
+      recipientRequestDetails: { type: DataTypes.TEXT, allowNull: false },
+      providerSubmissionUrl: { type: DataTypes.TEXT, allowNull: true },
+      providerSubmissionDate: { type: DataTypes.DATE, allowNull: true },
+      recipientConfirmationDate: { type: DataTypes.DATE, allowNull: true },
       paymentStatus: {
         type: DataTypes.ENUM("pending", "paid", "refunded", "disputed"),
         allowNull: false,
@@ -582,7 +723,26 @@ module.exports = {
       updatedAt: { type: DataTypes.DATE, allowNull: false },
     });
 
-    // 14. Create CommissionReviews Table
+    await queryInterface.addIndex("commissionOrders", ["listingId"], {
+      name: "commission_orders_listing_id_idx",
+    });
+    await queryInterface.addIndex("commissionOrders", ["providerId"], {
+      name: "commission_orders_provider_id_idx",
+    });
+    await queryInterface.addIndex("commissionOrders", ["recipientId"], {
+      name: "commission_orders_recipient_id_idx",
+    });
+    await queryInterface.addIndex("commissionOrders", ["status"], {
+      name: "commission_orders_status_idx",
+    });
+    await queryInterface.addIndex("commissionOrders", ["paymentStatus"], {
+      name: "commission_orders_payment_status_idx",
+    });
+    await queryInterface.addIndex("commissionOrders", ["createdAt"], {
+      name: "commission_orders_created_at_idx",
+    });
+
+    ////////////////////////// COMMISSIONREVIEWS //////////////////////////
     await queryInterface.createTable("commissionReviews", {
       id: {
         type: DataTypes.UUID,
@@ -592,21 +752,21 @@ module.exports = {
       },
       commissionOrderId: {
         type: DataTypes.BIGINT,
-        unique: true, // Ensures only one review per commission order
+        unique: true,
         allowNull: false,
         references: { model: "commissionOrders", key: "id" },
         onDelete: "CASCADE",
       },
-      artistId: {
+      providerId: {
         type: DataTypes.BIGINT,
         allowNull: false,
-        references: { model: "artistProfiles", key: "userId" },
+        references: { model: "users", key: "id" },
         onDelete: "CASCADE",
       },
-      clientId: {
+      recipientId: {
         type: DataTypes.BIGINT,
         allowNull: false,
-        references: { model: "clientProfiles", key: "userId" },
+        references: { model: "users", key: "id" },
         onDelete: "CASCADE",
       },
       rating: { type: DataTypes.INTEGER, allowNull: false },
@@ -615,7 +775,20 @@ module.exports = {
       updatedAt: { type: DataTypes.DATE, allowNull: false },
     });
 
-    // 15. Create SuggestedStyles Table
+    await queryInterface.addIndex("commissionReviews", ["providerId"], {
+      name: "commission_reviews_provider_id_idx",
+    });
+    await queryInterface.addIndex("commissionReviews", ["recipientId"], {
+      name: "commission_reviews_recipient_id_idx",
+    });
+    await queryInterface.addIndex("commissionReviews", ["rating"], {
+      name: "commission_reviews_rating_idx",
+    });
+    await queryInterface.addIndex("commissionReviews", ["createdAt"], {
+      name: "commission_reviews_created_at_idx",
+    });
+
+    ////////////////////////// SUGGESTEDSTYLES //////////////////////////
     await queryInterface.createTable("suggestedStyles", {
       id: {
         type: DataTypes.BIGINT,
@@ -644,272 +817,6 @@ module.exports = {
       updatedAt: { type: DataTypes.DATE, allowNull: false },
     });
 
-    // EmailPreferences Indexes
-    await queryInterface.addIndex("emailPreferences", ["userId"], {
-      name: "email_preferences_userid_idx",
-    });
-
-    // TOSAgreements Indexes
-    await queryInterface.addIndex("tosAgreements", ["userId"], {
-      name: "tos_agreements_userid_idx",
-    });
-    await queryInterface.addIndex("tosAgreements", ["tosVersion"], {
-      name: "tos_agreements_tos_version_idx",
-    });
-    await queryInterface.addIndex("tosAgreements", ["agreedAt"], {
-      name: "tos_agreements_agreed_at_idx",
-    });
-
-    // ArtistProfiles Indexes
-    await queryInterface.addIndex("artistProfiles", ["publicId"], {
-      unique: true,
-      name: "artist_profiles_public_id_unique_idx",
-    });
-    await queryInterface.addIndex("artistProfiles", ["displayName"], {
-      unique: true,
-      name: "artist_profiles_display_name_unique_idx",
-    });
-    await queryInterface.addIndex("artistProfiles", ["userId"], {
-      name: "artist_profiles_userid_idx",
-    });
-    await queryInterface.addIndex("artistProfiles", ["commissionStatus"], {
-      name: "artist_profiles_commission_status_idx",
-    });
-    await queryInterface.addIndex("artistProfiles", ["isVerified"], {
-      name: "artist_profiles_is_verified_idx",
-    });
-    await queryInterface.addIndex("artistProfiles", ["city", "state"], {
-      name: "artist_profiles_city_state_idx",
-    });
-    await queryInterface.addIndex("artistProfiles", ["stylesOffered"], {
-      using: "GIN",
-      name: "artist_profiles_styles_offered_gin_idx",
-    }); // GIN for ARRAY
-    await queryInterface.addIndex(
-      "artistProfiles",
-      ["totalCommissionsCompleted"],
-      { name: "artist_profiles_total_commissions_completed_idx" }
-    );
-    await queryInterface.addIndex("artistProfiles", ["totalRevenueEarned"], {
-      name: "artist_profiles_total_revenue_earned_idx",
-    });
-    await queryInterface.addIndex("artistProfiles", ["averageRating"], {
-      name: "artist_profiles_average_rating_idx",
-    });
-    await queryInterface.addIndex("artistProfiles", ["totalReviews"], {
-      name: "artist_profiles_total_reviews_idx",
-    });
-    await queryInterface.addIndex("artistProfiles", ["totalViews"], {
-      name: "artist_profiles_total_views_idx",
-    });
-    await queryInterface.addIndex("artistProfiles", ["totalFollowers"], {
-      name: "artist_profiles_total_followers_idx",
-    });
-    await queryInterface.addIndex("artistProfiles", ["lastActivityAt"], {
-      name: "artist_profiles_last_activity_at_idx",
-    });
-
-    // VerificationApplications Indexes
-    await queryInterface.addIndex("verificationApplications", ["artistId"], {
-      name: "verification_applications_artist_id_idx",
-    });
-    await queryInterface.addIndex("verificationApplications", ["status"], {
-      name: "verification_applications_status_idx",
-    });
-    await queryInterface.addIndex("verificationApplications", ["submittedAt"], {
-      name: "verification_applications_submitted_at_idx",
-    });
-    await queryInterface.addIndex("verificationApplications", ["reviewedAt"], {
-      name: "verification_applications_reviewed_at_idx",
-    });
-
-    // TattooDesigns Indexes
-    await queryInterface.addIndex("tattooDesigns", ["publicId"], {
-      unique: true,
-      name: "tattoo_designs_public_id_unique_idx",
-    });
-    await queryInterface.addIndex("tattooDesigns", ["artistId"], {
-      name: "tattoo_designs_artist_id_idx",
-    });
-    await queryInterface.addIndex("tattooDesigns", ["style"], {
-      name: "tattoo_designs_style_idx",
-    });
-    await queryInterface.addIndex("tattooDesigns", ["totalViews"], {
-      name: "tattoo_designs_total_views_idx",
-    });
-    await queryInterface.addIndex("tattooDesigns", ["totalFavorites"], {
-      name: "tattoo_designs_total_favorites_idx",
-    });
-    await queryInterface.addIndex("tattooDesigns", ["totalShares"], {
-      name: "tattoo_designs_total_shares_idx",
-    });
-    await queryInterface.addIndex("tattooDesigns", ["createdAt"], {
-      name: "tattoo_designs_created_at_idx",
-    });
-
-    // Collections Indexes
-    await queryInterface.addIndex("collections", ["publicId"], {
-      unique: true,
-      name: "collections_public_id_unique_idx",
-    });
-    await queryInterface.addIndex("collections", ["artistId"], {
-      name: "collections_artist_id_idx",
-    });
-    await queryInterface.addIndex("collections", ["name"], {
-      name: "collections_name_idx",
-    });
-    await queryInterface.addIndex("collections", ["totalViews"], {
-      name: "collections_total_views_idx",
-    });
-    await queryInterface.addIndex("collections", ["createdAt"], {
-      name: "collections_created_at_idx",
-    });
-
-    // CollectionDesigns Indexes
-    await queryInterface.addIndex("collectionDesigns", ["collectionId"], {
-      name: "collection_designs_collection_id_idx",
-    });
-    await queryInterface.addIndex("collectionDesigns", ["designId"], {
-      name: "collection_designs_design_id_idx",
-    });
-
-    // CommissionListings Indexes
-    await queryInterface.addIndex("commissionListings", ["publicId"], {
-      unique: true,
-      name: "commission_listings_public_id_unique_idx",
-    });
-    await queryInterface.addIndex("commissionListings", ["artistId"], {
-      name: "commission_listings_artist_id_idx",
-    });
-    await queryInterface.addIndex("commissionListings", ["isActive"], {
-      name: "commission_listings_is_active_idx",
-    });
-    await queryInterface.addIndex("commissionListings", ["basePrice"], {
-      name: "commission_listings_base_price_idx",
-    });
-    await queryInterface.addIndex("commissionListings", ["totalViews"], {
-      name: "commission_listings_total_views_idx",
-    });
-    await queryInterface.addIndex("commissionListings", ["totalInquiries"], {
-      name: "commission_listings_total_inquiries_idx",
-    });
-    await queryInterface.addIndex("commissionListings", ["createdAt"], {
-      name: "commission_listings_created_at_idx",
-    });
-
-    // ClientProfiles Indexes
-    await queryInterface.addIndex("clientProfiles", ["publicId"], {
-      unique: true,
-      name: "client_profiles_public_id_unique_idx",
-    });
-    await queryInterface.addIndex("clientProfiles", ["userId"], {
-      name: "client_profiles_userid_idx",
-    });
-    await queryInterface.addIndex("clientProfiles", ["displayName"], {
-      name: "client_profiles_display_name_idx",
-    });
-    await queryInterface.addIndex("clientProfiles", ["stripeCustomerId"], {
-      unique: true,
-      name: "client_profiles_stripe_customer_id_unique_idx",
-    });
-    await queryInterface.addIndex("clientProfiles", ["totalViews"], {
-      name: "client_profiles_total_views_idx",
-    });
-    await queryInterface.addIndex("clientProfiles", ["lastActivityAt"], {
-      name: "client_profiles_last_activity_at_idx",
-    });
-
-    // ClientFavoriteDesigns Indexes
-    await queryInterface.addIndex("clientFavoriteDesigns", ["clientId"], {
-      name: "client_favorite_designs_client_id_idx",
-    });
-    await queryInterface.addIndex("clientFavoriteDesigns", ["designId"], {
-      name: "client_favorite_designs_design_id_idx",
-    });
-    await queryInterface.addIndex("clientFavoriteDesigns", ["favoritedAt"], {
-      name: "client_favorite_designs_favorited_at_idx",
-    });
-
-    // ClientFavoriteArtists Indexes
-    await queryInterface.addIndex("clientFavoriteArtists", ["clientId"], {
-      name: "client_favorite_artists_client_id_idx",
-    });
-    await queryInterface.addIndex("clientFavoriteArtists", ["artistId"], {
-      name: "client_favorite_artists_artist_id_idx",
-    });
-    await queryInterface.addIndex("clientFavoriteArtists", ["favoritedAt"], {
-      name: "client_favorite_artists_favorited_at_idx",
-    });
-
-    // CommissionOrders Indexes
-    await queryInterface.addIndex("commissionOrders", ["listingId"], {
-      name: "commission_orders_listing_id_idx",
-    });
-    await queryInterface.addIndex("commissionOrders", ["artistId"], {
-      name: "commission_orders_artist_id_idx",
-    });
-    await queryInterface.addIndex("commissionOrders", ["clientId"], {
-      name: "commission_orders_client_id_idx",
-    });
-    await queryInterface.addIndex("commissionOrders", ["status"], {
-      name: "commission_orders_status_idx",
-    });
-    await queryInterface.addIndex("commissionOrders", ["paymentStatus"], {
-      name: "commission_orders_payment_status_idx",
-    });
-    await queryInterface.addIndex("commissionOrders", ["createdAt"], {
-      name: "commission_orders_created_at_idx",
-    });
-
-    // CommissionReviews Indexes
-    await queryInterface.addIndex("commissionReviews", ["artistId"], {
-      name: "commission_reviews_artist_id_idx",
-    });
-    await queryInterface.addIndex("commissionReviews", ["clientId"], {
-      name: "commission_reviews_client_id_idx",
-    });
-    await queryInterface.addIndex("commissionReviews", ["rating"], {
-      name: "commission_reviews_rating_idx",
-    });
-    await queryInterface.addIndex("commissionReviews", ["createdAt"], {
-      name: "commission_reviews_created_at_idx",
-    });
-
-    await queryInterface.sequelize.query(
-      "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
-    );
-
-    await queryInterface.sequelize.query(`
-      CREATE OR REPLACE FUNCTION immutable_array_to_tsvector(config regconfig, arr text[])
-      RETURNS tsvector LANGUAGE plpgsql IMMUTABLE AS $$
-      BEGIN
-        RETURN to_tsvector(config, coalesce(array_to_string(arr, ' '), ''));
-      END;
-      $$;
-    `);
-
-    // 2. ArtistProfiles TSVECTOR setup - Using the new immutable function
-    await queryInterface.sequelize.query(`
-      ALTER TABLE "artistProfiles" ADD COLUMN IF NOT EXISTS "searchVector" TSVECTOR
-        GENERATED ALWAYS AS (
-          setweight(to_tsvector('english'::regconfig, coalesce("displayName", '')), 'A') ||
-          setweight(to_tsvector('english'::regconfig, coalesce("bio", '')), 'B') ||
-          setweight(immutable_array_to_tsvector('english'::regconfig, "stylesOffered"), 'C') -- CRITICAL CHANGE: Using immutable_array_to_tsvector
-        ) STORED;
-    `);
-
-    // 3. TattooDesigns TSVECTOR setup - Using the new immutable function
-    await queryInterface.sequelize.query(`
-      ALTER TABLE "tattooDesigns" ADD COLUMN IF NOT EXISTS "searchVector" TSVECTOR
-        GENERATED ALWAYS AS (
-          setweight(to_tsvector('english'::regconfig, coalesce("title", '')), 'A') ||
-          setweight(to_tsvector('english'::regconfig, coalesce("description", '')), 'B') ||
-          setweight(immutable_array_to_tsvector('english'::regconfig, "tags"), 'C') || -- CRITICAL CHANGE: Using immutable_array_to_tsvector
-          setweight(to_tsvector('english'::regconfig, coalesce("style", '')), 'B')
-        ) STORED;
-    `);
-
-    // 4. CommissionListings TSVECTOR setup (no change needed here as it doesn't use arrays)
     await queryInterface.sequelize.query(`
       ALTER TABLE "commissionListings" ADD COLUMN IF NOT EXISTS "searchVector" TSVECTOR
         GENERATED ALWAYS AS (
@@ -918,15 +825,6 @@ module.exports = {
         ) STORED;
     `);
 
-    // Add GIN indexes for TSVECTOR columns
-    await queryInterface.addIndex("artistProfiles", ["searchVector"], {
-      using: "GIN",
-      name: "artist_profiles_search_vector_idx",
-    });
-    await queryInterface.addIndex("tattooDesigns", ["searchVector"], {
-      using: "GIN",
-      name: "tattoo_designs_search_vector_idx",
-    });
     await queryInterface.addIndex("commissionListings", ["searchVector"], {
       using: "GIN",
       name: "commission_listings_search_vector_idx",
@@ -934,28 +832,19 @@ module.exports = {
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.sequelize.query(`
-    DO
-    $$
-    DECLARE
-      r RECORD;
-    BEGIN
-      -- Drop all tables except spatial_ref_sys
-      FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename != 'spatial_ref_sys') LOOP
-        EXECUTE 'DROP TABLE IF EXISTS public.' || quote_ident(r.tablename) || ' CASCADE';
-      END LOOP;
-      
-      -- Drop all enum types in public schema
-      FOR r IN (
-        SELECT t.typname 
-        FROM pg_type t 
-        JOIN pg_namespace n ON n.oid = t.typnamespace 
-        WHERE n.nspname = 'public' AND t.typtype = 'e'
-      ) LOOP
-        EXECUTE 'DROP TYPE IF EXISTS public.' || quote_ident(r.typname) || ' CASCADE';
-      END LOOP;
-    END
-    $$;
-  `);
+    await queryInterface.dropTable("suggestedStyles");
+    await queryInterface.dropTable("commissionReviews");
+    await queryInterface.dropTable("commissionOrders");
+    await queryInterface.dropTable("favoriteArtists");
+    await queryInterface.dropTable("favoriteDesigns");
+    await queryInterface.dropTable("commissionListings");
+    await queryInterface.dropTable("collectionDesigns");
+    await queryInterface.dropTable("collections");
+    await queryInterface.dropTable("tattooDesigns");
+    await queryInterface.dropTable("verificationApplications");
+    await queryInterface.dropTable("artistDetails");
+    await queryInterface.dropTable("tosAgreements");
+    await queryInterface.dropTable("emailPreferences");
+    await queryInterface.dropTable("users");
   },
 };

@@ -419,12 +419,6 @@ const ArtistDetails = db.define(
       allowNull: false,
       validate: { min: 0, isInt: true },
     },
-    totalFollowers: {
-      type: DataTypes.INTEGER,
-      defaultValue: 0,
-      allowNull: false,
-      validate: { min: 0, isInt: true },
-    }
   },
   {
     timestamps: true,
@@ -451,10 +445,6 @@ const ArtistDetails = db.define(
       },
       { fields: ["averageRating"], name: "artist_details_average_rating_idx" },
       { fields: ["totalReviews"], name: "artist_details_total_reviews_idx" },
-      {
-        fields: ["totalFollowers"],
-        name: "artist_details_total_followers_idx",
-      },
       {
         fields: ["searchVector"],
         using: "GIN",

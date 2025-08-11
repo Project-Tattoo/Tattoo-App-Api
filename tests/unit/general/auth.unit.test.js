@@ -5,8 +5,7 @@ const crypto = require("crypto");
 const authController = require("./../../../controllers/general/authController");
 const AppError = require("../../../utils/appError");
 const Users = require("../../../models/shared/Users");
-const ClientProfiles = require("../../../models/clients/ClientProfiles");
-const ArtistProfiles = require("../../../models/artists/ArtistProfiles");
+const ArtistDetails = require("../../../models/artists/ArtistDetails");
 const EmailPreference = require("../../../models/shared/EmailPreferences");
 const TOSAgreement = require("../../../models/shared/TOSAgreement");
 const db = require("../../../server");
@@ -50,8 +49,7 @@ const setupMockTransactionAndUser = () => {
 
   jest.spyOn(EmailPreference, "create").mockResolvedValue({});
   jest.spyOn(TOSAgreement, "create").mockResolvedValue({});
-  jest.spyOn(ArtistProfiles, "create").mockResolvedValue({});
-  jest.spyOn(ClientProfiles, "create").mockResolvedValue({});
+  jest.spyOn(ArtistDetails, "create").mockResolvedValue({});
 };
 
 describe("Auth API Unit Tests", () => {
@@ -107,7 +105,7 @@ describe("Auth API Unit Tests", () => {
           email: "test@example.com",
           password: "password123",
           passwordConfirm: "password1234",
-          role: "client",
+          role: "user",
         },
         ip: "127.0.0.1",
       };
@@ -182,6 +180,7 @@ describe("Auth API Unit Tests", () => {
           password: "password123",
           passwordConfirm: "password123",
           role: "artist",
+          displayName: "testing3",
         },
         ip: "127.0.0.1",
       };
@@ -196,7 +195,7 @@ describe("Auth API Unit Tests", () => {
 
       expect(next).toHaveBeenCalledWith(expect.any(AppError));
       expect(next.mock.calls[0][0].message).toMatch(
-        /display name, city, state, and zipcode/
+        /city, state, and zipcode/
       );
 
       expect(res.status).not.toHaveBeenCalled();
@@ -212,7 +211,8 @@ describe("Auth API Unit Tests", () => {
           email: "duplicate@example.com",
           password: "Password123!",
           passwordConfirm: "Password123!",
-          role: "client",
+          role: "user",
+          displayName: "sequelizeuniqueconstraintuser",
         },
       });
       const res = mockResponse();
@@ -221,9 +221,10 @@ describe("Auth API Unit Tests", () => {
       await Users.create({
         email: "duplicate@example.com",
         passwordHash: "hashedpsddewor",
-        role: "client",
+        role: "user",
         isActive: true,
         verifiedEmail: false,
+        displayName: "sequelizeuniqueconstraintuser2"
       });
 
       await new Promise((resolve) => {
@@ -248,7 +249,8 @@ describe("Auth API Unit Tests", () => {
           email: "invalid-email",
           password: "Password123!",
           passwordConfirm: "Password123!",
-          role: "client",
+          role: "user",
+          displayName: "testing2",
         },
       });
       const res = mockResponse();
@@ -280,7 +282,8 @@ describe("Auth API Unit Tests", () => {
           email: "test@example.com",
           password: "Password123!",
           passwordConfirm: "Password123!",
-          role: "client",
+          role: "user",
+          displayName: "testUser",
         },
       });
       const res = mockResponse();
@@ -709,7 +712,7 @@ describe("Auth API Unit Tests", () => {
 
     it("should throw next AppError when a client tries to access an artist route", () => {
       const req = {
-        user: { role: "client" },
+        user: { role: "user" },
       };
       const res = mockResponse();
       const next = jest.fn();
