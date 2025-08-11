@@ -1,9 +1,9 @@
 const { DataTypes } = require("sequelize");
-const db = require("./../../server");
+const db = require("../../server");
 const ArtistDetails = require("./ArtistDetails");
 
-const Collections = db.define(
-  "collections",
+const PortfolioCollections = db.define(
+  "portfolioCollections",
   {
     id: {
       type: DataTypes.BIGINT,
@@ -72,4 +72,4 @@ const Collections = db.define(
    }
 );
 
-module.exports = Collections;
+module.exports = PortfolioCollections;

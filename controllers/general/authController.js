@@ -477,7 +477,7 @@ exports.resetPassword = catchAsync(async (req, res, next) => {
     return next(new AppError("Token is invalid or has expired", 400));
   }
 
-  // Should add email logic to send an email on successful password change, so if it wasnt intentional they can take action
+  // REMINDER: Should add email logic to send an email on successful password change, so if it wasnt intentional they can take action
 
   user.passwordHash = req.body.password;
   user.passwordResetToken = undefined;
@@ -505,7 +505,7 @@ exports.updatePassword = catchAsync(async (req, res, next) => {
   if (!isCorrect)
     return next(new AppError("Your current password is wrong.", 401));
 
-  // should add email logic to notify that password has changed
+  // REMINDER: should add email logic to notify that password has changed
 
   user.passwordHash = req.body.password;
   await user.save();

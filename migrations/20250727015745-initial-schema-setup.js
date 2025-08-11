@@ -442,8 +442,8 @@ module.exports = {
       name: "tattoo_designs_search_vector_idx",
     });
 
-    ////////////////////////// COLLECTIONS //////////////////////////
-    await queryInterface.createTable("collections", {
+    ////////////////////////// PORTFOLIOCOLLECTIONS //////////////////////////
+    await queryInterface.createTable("portfolioCollections", {
       id: {
         type: DataTypes.BIGINT,
         primaryKey: true,
@@ -788,6 +788,148 @@ module.exports = {
       name: "commission_reviews_created_at_idx",
     });
 
+    ////////////////////////// COLLECTIONARTWORKS //////////////////////////
+
+    await queryInterface.createTable("commissionArtworks", {
+      id: {
+        type: Sequelize.BIGINT,
+        autoIncrement: true,
+        primaryKey: true,
+        allowNull: false,
+      },
+      publicId: {
+        type: Sequelize.UUID,
+        defaultValue: Sequelize.UUIDV4,
+        unique: true,
+        allowNull: false,
+      },
+      commissionOrderId: {
+        type: Sequelize.BIGINT,
+        unique: true,
+        allowNull: false,
+        references: {
+          model: "commissionOrders",
+          key: "id",
+        },
+        onDelete: "CASCADE",
+      },
+      providerId: {
+        type: Sequelize.BIGINT,
+        allowNull: false,
+        references: {
+          model: "Users",
+          key: "id",
+        },
+        onDelete: "CASCADE",
+      },
+      artworkUrl: {
+        type: Sequelize.TEXT,
+        allowNull: false,
+      },
+      reviewId: {
+        type: Sequelize.UUID,
+        allowNull: true,
+        references: {
+          model: "commissionReviews",
+          key: "id",
+        },
+        onDelete: "SET NULL",
+      },
+      isPublic: {
+        type: Sequelize.BOOLEAN,
+        defaultValue: false,
+        allowNull: false,
+      },
+      totalViews: {
+        type: Sequelize.INTEGER,
+        defaultValue: 0,
+        allowNull: false,
+      },
+      totalFavorites: {
+        type: Sequelize.INTEGER,
+        defaultValue: 0,
+        allowNull: false,
+      },
+      madePublicAt: {
+        type: Sequelize.DATE,
+        allowNull: true,
+      },
+      createdAt: {
+        allowNull: false,
+        type: Sequelize.DATE,
+      },
+      updatedAt: {
+        allowNull: false,
+        type: Sequelize.DATE,
+      },
+    });
+
+    await queryInterface.addIndex("commissionArtworks", ["providerId"], {
+      name: "commission_artworks_provider_id_idx",
+    });
+    await queryInterface.addIndex("commissionArtworks", ["isPublic"], {
+      name: "commission_artworks_is_public_idx",
+    });
+
+    ////////////////////////// NOTIFICATIONS //////////////////////////
+
+    await queryInterface.createTable("notifications", {
+      id: {
+        type: Sequelize.BIGINT,
+        autoIncrement: true,
+        primaryKey: true,
+        allowNull: false,
+      },
+      userId: {
+        type: Sequelize.BIGINT,
+        allowNull: false,
+        references: {
+          model: "Users",
+          key: "id",
+        },
+        onDelete: "CASCADE",
+      },
+      notificationType: {
+        type: DataTypes.ENUM(
+          "new_message",
+          "commission_received",
+          "commission_completed",
+          "commission_status_update",
+          "design_favorited",
+          "profile_favorited",
+          "commission_order_placed",
+          "system_alert"
+        ),
+        defaultValue: "system_alert",
+        allowNull: false,
+      },
+      message: {
+        type: Sequelize.TEXT,
+        allowNull: false,
+      },
+      isRead: {
+        type: Sequelize.BOOLEAN,
+        defaultValue: false,
+        allowNull: false,
+      },
+      metadata: {
+        type: DataTypes.JSONB,
+        allowNull: true,
+      },
+      createdAt: {
+        allowNull: false,
+        type: Sequelize.DATE,
+      },
+      updatedAt: {
+        allowNull: false,
+        type: Sequelize.DATE,
+      },
+    });
+
+    await queryInterface.addIndex("notifications", ["userId"], {
+      name: "notifications_user_id_idx",
+    });
+
     ////////////////////////// SUGGESTEDSTYLES //////////////////////////
     await queryInterface.createTable("suggestedStyles", {
       id: {
@@ -846,5 +988,7 @@ module.exports = {
     await queryInterface.dropTable("tosAgreements");
     await queryInterface.dropTable("emailPreferences");
     await queryInterface.dropTable("users");
+    await queryInterface.dropTable("notifications");
+    await queryInterface.dropTable("commissionArtworks");
   },
 };
