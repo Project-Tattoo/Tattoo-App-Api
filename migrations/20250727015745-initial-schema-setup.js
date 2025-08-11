@@ -3,7 +3,8 @@ const { DataTypes } = require("sequelize");
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
-    // 1. Create Users Table
+
+    ////////////////////////// USERS //////////////////////////
     await queryInterface.createTable("users", {
       id: {
         type: DataTypes.BIGINT,
@@ -19,13 +20,28 @@ module.exports = {
       },
       email: { type: DataTypes.STRING, unique: true, allowNull: false },
       passwordHash: { type: DataTypes.STRING, allowNull: false },
+      stripeCustomerId: { type: DataTypes.STRING, allowNull: false },
+      displayName: { type: DataTypes.STRING, allowNull: false, unique: true },
+      bio: { type: DataTypes.TEXT, allowNull: true },
+      socialMediaLinks: { type: DataTypes.JSONB, allowNull: true },
+      profilePictureUrl: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        defaultValue: "www.defaultpfp.com",
+      },
+      searchVector: { type: DataTypes.TSVECTOR, allowNull: true },
+      totalViews: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0,
+        allowNull: false,
+      },
       passwordChangedAt: { type: DataTypes.DATE, allowNull: true },
       passwordResetToken: { type: DataTypes.STRING, allowNull: true },
       passwordResetExpires: { type: DataTypes.DATE, allowNull: true },
       role: {
-        type: DataTypes.ENUM("artist", "client", "admin"),
+        type: DataTypes.ENUM("artist", "user", "admin"),
         allowNull: false,
-        defaultValue: "client",
+        defaultValue: "user",
       },
       isActive: {
         type: DataTypes.BOOLEAN,
@@ -39,9 +55,55 @@ module.exports = {
       },
       verifyToken: { type: DataTypes.STRING, allowNull: true },
       verifyExpires: { type: DataTypes.DATE, allowNull: true },
+      lastActivityAt: { type: DataTypes.DATE, allowNull: true },
       createdAt: { type: DataTypes.DATE, allowNull: false },
       updatedAt: { type: DataTypes.DATE, allowNull: false },
     });
+
+    await queryInterface.addIndex("users", ["publicId"], {
+      unique: true,
+      name: "users_public_id_unique_idx",
+    });
+    await queryInterface.addIndex("users", ["email"], {
+      unique: true,
+      name: "users_email_unique_idx",
+    });
+    await queryInterface.addIndex("users", ["role"], {
+      name: "users_role_idx",
+    });
+    await queryInterface.addIndex("users", ["isActive"], {
+      name: "users_is_active_idx",
+    });
+    await queryInterface.addIndex("users", ["verifiedEmail"], {
+      name: "users_verified_email_idx",
+    });
+    await queryInterface.addIndex("users", ["passwordResetToken"], {
+      name: "users_password_reset_token_idx",
+    });
+    await queryInterface.addIndex("users", ["verifyToken"], {
+      name: "users_verify_token_idx",
+    });
+    await queryInterface.addIndex("users", ["displayName"], {
+      name: "users_profiles_display_name_unique_idx",
+    });
+    await queryInterface.addIndex("users", ["totalViews"], {
+      name: "user_profiles_total_views_idx",
+    });
+    await queryInterface.addIndex("users", ["lastActivityAt"], {
+      name: "user_profiles_last_activity_at_idx",
+    });
+    await queryInterface.addIndex("users", ["searchVector"], {
+      using: "GIN",
+      name: "users_search_vector_idx",
+    });
+
+    await queryInterface.sequelize.query(`
+      ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "searchVector" TSVECTOR
+        GENERATED ALWAYS AS (
+          setweight(to_tsvector('english'::regconfig, coalesce("displayName", '')), 'A') ||
+          setweight(to_tsvector('english'::regconfig, coalesce("bio", '')), 'B') ||
+        ) STORED;
+    `);
 
     // 2. Create EmailPreferences Table
     await queryInterface.createTable("emailPreferences", {
@@ -404,7 +466,7 @@ module.exports = {
         type: DataTypes.STRING,
         allowNull: true,
         unique: true,
-      }, // Added stripeCustomerId
+      },
       totalViews: {
         type: DataTypes.INTEGER,
         defaultValue: 0,
@@ -580,31 +642,6 @@ module.exports = {
       },
       createdAt: { type: DataTypes.DATE, allowNull: false },
       updatedAt: { type: DataTypes.DATE, allowNull: false },
-    });
-
-    // Users Indexes
-    await queryInterface.addIndex("users", ["publicId"], {
-      unique: true,
-      name: "users_public_id_unique_idx",
-    });
-    await queryInterface.addIndex("users", ["email"], {
-      unique: true,
-      name: "users_email_unique_idx",
-    });
-    await queryInterface.addIndex("users", ["role"], {
-      name: "users_role_idx",
-    });
-    await queryInterface.addIndex("users", ["isActive"], {
-      name: "users_is_active_idx",
-    });
-    await queryInterface.addIndex("users", ["verifiedEmail"], {
-      name: "users_verified_email_idx",
-    });
-    await queryInterface.addIndex("users", ["passwordResetToken"], {
-      name: "users_password_reset_token_idx",
-    });
-    await queryInterface.addIndex("users", ["verifyToken"], {
-      name: "users_verify_token_idx",
     });
 
     // EmailPreferences Indexes
@@ -838,14 +875,10 @@ module.exports = {
       name: "commission_reviews_created_at_idx",
     });
 
-    // 1. Enable pg_trgm extension
     await queryInterface.sequelize.query(
       "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
     );
 
-    // CRITICAL FIX: Create an immutable function for array to tsvector conversion
-    // This explicitly tells PostgreSQL that the function's output is always the same for the same input,
-    // satisfying the immutability requirement for GENERATED ALWAYS AS columns.
     await queryInterface.sequelize.query(`
       CREATE OR REPLACE FUNCTION immutable_array_to_tsvector(config regconfig, arr text[])
       RETURNS tsvector LANGUAGE plpgsql IMMUTABLE AS $$
@@ -901,52 +934,28 @@ module.exports = {
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.removeIndex(
-      "artistProfiles",
-      "artist_profiles_search_vector_idx"
-    );
-    await queryInterface.removeIndex(
-      "tattooDesigns",
-      "tattoo_designs_search_vector_idx"
-    );
-    await queryInterface.removeIndex(
-      "commissionListings",
-      "commission_listings_search_vector_idx"
-    );
-
-    await queryInterface.sequelize.query(
-      'ALTER TABLE "artistProfiles" DROP COLUMN IF EXISTS "searchVector";'
-    );
-    await queryInterface.sequelize.query(
-      'ALTER TABLE "tattooDesigns" DROP COLUMN IF EXISTS "searchVector";'
-    );
-    await queryInterface.sequelize.query(
-      'ALTER TABLE "commissionListings" DROP COLUMN IF EXISTS "searchVector";'
-    );
-
-    await queryInterface.removeConstraint(
-      "artistProfiles",
-      "artistProfiles_currentVerificationApplicationId_fkey"
-    );
-    await queryInterface.removeColumn(
-      "artistProfiles",
-      "currentVerificationApplicationId"
-    );
-
-    await queryInterface.dropTable("suggestedStyles");
-    await queryInterface.dropTable("commissionReviews");
-    await queryInterface.dropTable("commissionOrders");
-    await queryInterface.dropTable("clientFavoriteArtists");
-    await queryInterface.dropTable("clientFavoriteDesigns");
-    await queryInterface.dropTable("clientProfiles");
-    await queryInterface.dropTable("commissionListings");
-    await queryInterface.dropTable("collectionDesigns");
-    await queryInterface.dropTable("collections");
-    await queryInterface.dropTable("tattooDesigns");
-    await queryInterface.dropTable("verificationApplications");
-    await queryInterface.dropTable("artistProfiles");
-    await queryInterface.dropTable("tosAgreements");
-    await queryInterface.dropTable("emailPreferences");
-    await queryInterface.dropTable("users");
+    await queryInterface.sequelize.query(`
+    DO
+    $$
+    DECLARE
+      r RECORD;
+    BEGIN
+      -- Drop all tables except spatial_ref_sys
+      FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename != 'spatial_ref_sys') LOOP
+        EXECUTE 'DROP TABLE IF EXISTS public.' || quote_ident(r.tablename) || ' CASCADE';
+      END LOOP;
+      
+      -- Drop all enum types in public schema
+      FOR r IN (
+        SELECT t.typname 
+        FROM pg_type t 
+        JOIN pg_namespace n ON n.oid = t.typnamespace 
+        WHERE n.nspname = 'public' AND t.typtype = 'e'
+      ) LOOP
+        EXECUTE 'DROP TYPE IF EXISTS public.' || quote_ident(r.typname) || ' CASCADE';
+      END LOOP;
+    END
+    $$;
+  `);
   },
 };

@@ -1,18 +1,15 @@
 const db = require("./../server");
-const Sequelize = require("sequelize");
-
 const Users = require("./shared/Users");
 const EmailPreference = require("./shared/EmailPreferences");
 const TOSAgreement = require("./shared/TOSAgreement");
-const ArtistProfiles = require("./artists/ArtistProfiles");
+const ArtistDetails = require("./artists/ArtistDetails");
 const VerificationApplications = require("./artists/VerificationApplications");
 const TattooDesigns = require("./artists/TattooDesigns");
 const Collections = require("./artists/Collections");
 const CollectionDesigns = require("./artists/CollectionDesigns");
 const CommissionListing = require("./artists/CommissionListing");
-const ClientProfiles = require("./clients/ClientProfiles");
-const ClientFavoriteDesigns = require("./clients/ClientFavoriteDesigns");
-const ClientFavoriteArtists = require("./clients/ClientFavoriteArtists");
+const FavoriteDesigns = require("./shared/FavoriteDesigns");
+const FavoriteArtists = require("./shared/ClientFavoriteArtists");
 const CommissionOrders = require("./shared/CommissionOrders");
 const CommissionReviews = require("./shared/CommissionReviews");
 
@@ -21,59 +18,64 @@ Users.hasOne(EmailPreference, { foreignKey: "userId" });
 EmailPreference.belongsTo(Users, { foreignKey: "userId" });
 Users.hasMany(TOSAgreement, { foreignKey: "userId" });
 TOSAgreement.belongsTo(Users, { foreignKey: "userId" });
-
 CommissionListing.hasMany(CommissionOrders, {
   foreignKey: "listingId",
   sourceKey: "id",
-  onDelete: "SET NULL", 
-  allowNull: true 
+  onDelete: "SET NULL",
+  allowNull: true,
 });
-
-ArtistProfiles.hasMany(CommissionOrders, {
-  foreignKey: "artistId",
-  sourceKey: "userId",
+Users.hasMany(CommissionOrders, {
+  foreignKey: "providerId",
+  sourceKey: "id",
   onDelete: "SET NULL",
 });
-
-CommissionOrders.belongsTo(ArtistProfiles, { foreignKey: "artistId", targetKey: "userId" });
-
-CommissionOrders.belongsTo(CommissionListing, { foreignKey: "listingId", targetKey: "id" });
-
-ArtistProfiles.hasMany(CommissionReviews, {
-  foreignKey: "artistId",
-  sourceKey: "userId",
+Users.hasMany(CommissionOrders, {
+  foreignKey: "recipientId",
+  sourceKey: "id",
+  onDelete: "SET NULL",
+});
+CommissionOrders.belongsTo(Users, {
+  foreignKey: "providerId",
+  targetKey: "id",
+});
+CommissionOrders.belongsTo(Users, {
+  foreignKey: "recipientId",
+  targetKey: "id",
+});
+CommissionOrders.belongsTo(CommissionListing, {
+  foreignKey: "listingId",
+  targetKey: "id",
+});
+Users.hasMany(CommissionReviews, {
+  foreignKey: "providerId",
+  sourceKey: "id",
+  onDelete: "CASCADE",
+  as: "commissionReviewsReceived",
+});
+Users.hasMany(CommissionReviews, {
+  foreignKey: "recipientId",
+  sourceKey: "id",
   onDelete: "CASCADE",
   as: "commissionReviewsGiven",
 });
-
-CommissionReviews.belongsTo(ArtistProfiles, {
-  foreignKey: "artistId",
-  targetKey: "userId",
+CommissionReviews.belongsTo(Users, {
+  foreignKey: "providerId",
+  targetKey: "id",
 });
-
-ClientProfiles.hasMany(CommissionReviews, {
-  foreignKey: "clientId",
-  sourceKey: "userId",
-  onDelete: "SET NULL",
-  as: "commissionReviewsWritten",
-});
-CommissionReviews.belongsTo(ClientProfiles, {
-  foreignKey: "clientId",
-  targetKey: "userId",
+CommissionReviews.belongsTo(Users, {
+  foreignKey: "recipientId",
+  targetKey: "id",
 });
 
 // Artists
-ArtistProfiles.belongsTo(Users, { foreignKey: "userId" });
-Users.hasOne(ArtistProfiles, { foreignKey: "userId" });
-
-ArtistProfiles.hasMany(VerificationApplications, { foreignKey: "artistId" });
-VerificationApplications.belongsTo(ArtistProfiles, { foreignKey: "artistId" });
-
-ArtistProfiles.hasMany(TattooDesigns, { foreignKey: "artistId" });
-TattooDesigns.belongsTo(ArtistProfiles, { foreignKey: "artistId" });
-
-ArtistProfiles.hasMany(Collections, { foreignKey: "artistId" });
-Collections.belongsTo(ArtistProfiles, { foreignKey: "artistId" });
+ArtistDetails.belongsTo(Users, { foreignKey: "userId" });
+Users.hasOne(ArtistDetails, { foreignKey: "userId" });
+ArtistDetails.hasMany(VerificationApplications, { foreignKey: "artistId" });
+VerificationApplications.belongsTo(ArtistDetails, { foreignKey: "artistId" });
+ArtistDetails.hasMany(TattooDesigns, { foreignKey: "artistId" });
+TattooDesigns.belongsTo(ArtistDetails, { foreignKey: "artistId" });
+ArtistDetails.hasMany(Collections, { foreignKey: "artistId" });
+Collections.belongsTo(ArtistDetails, { foreignKey: "artistId" });
 Collections.belongsToMany(TattooDesigns, {
   through: CollectionDesigns,
   foreignKey: "collectionId",
@@ -86,36 +88,35 @@ TattooDesigns.belongsToMany(Collections, {
   otherKey: "collectionId",
   as: "collections",
 });
-ArtistProfiles.hasMany(CommissionListing, { foreignKey: "artistId" });
-CommissionListing.belongsTo(ArtistProfiles, { foreignKey: "artistId" });
+ArtistDetails.hasMany(CommissionListing, { foreignKey: "artistId" });
+CommissionListing.belongsTo(ArtistDetails, { foreignKey: "artistId" });
 
-// Clients
-ClientProfiles.belongsTo(Users, { foreignKey: "userId" });
-Users.hasOne(ClientProfiles, { foreignKey: "userId" });
-
-ClientProfiles.belongsToMany(TattooDesigns, {
-  through: ClientFavoriteDesigns,
-  foreignKey: "clientId",
+// Shared
+Users.belongsToMany(TattooDesigns, {
+  through: FavoriteDesigns,
+  foreignKey: "userId",
   otherKey: "designId",
   as: "favoriteDesigns",
 });
-TattooDesigns.belongsToMany(ClientProfiles, {
-  through: ClientFavoriteDesigns,
+
+TattooDesigns.belongsToMany(Users, {
+  through: FavoriteDesigns,
   foreignKey: "designId",
-  other: "clientId",
-  as: "favoritedByClientsForDesigns",
+  otherKey: "userId",
+  as: "favoritedByUsersForDesigns",
 });
 
-ClientProfiles.belongsToMany(ArtistProfiles, {
-  through: ClientFavoriteArtists,
-  foreignKey: "clientId",
+Users.belongsToMany(ArtistDetails, {
+  through: FavoriteArtists,
+  foreignKey: "userId",
   otherKey: "artistId",
   as: "favoriteArtists",
 });
-ArtistProfiles.belongsToMany(ClientProfiles, {
-  through: ClientFavoriteArtists,
+
+ArtistDetails.belongsToMany(Users, {
+  through: FavoriteArtists,
   foreignKey: "artistId",
-  other: "clientId",
+  otherKey: "userId",
   as: "favoritedByClientsForArtists",
 });
 
@@ -124,15 +125,14 @@ module.exports = {
   Users,
   EmailPreference,
   TOSAgreement,
-  ArtistProfiles,
+  ArtistDetails,
   VerificationApplications,
   TattooDesigns,
   Collections,
   CollectionDesigns,
   CommissionListing,
-  ClientProfiles,
-  ClientFavoriteDesigns,
-  ClientFavoriteArtists,
+  FavoriteDesigns,
+  FavoriteArtists,
   CommissionOrders,
-  CommissionReviews
+  CommissionReviews,
 };

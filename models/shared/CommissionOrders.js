@@ -1,8 +1,7 @@
 const { DataTypes } = require("sequelize");
 const db = require("./../../server");
 const CommissionListings = require("./../artists/CommissionListing");
-const ArtistProfiles = require("./../artists/ArtistProfiles");
-const ClientProfiles = require("./../clients/ClientProfiles");
+const Users = require("./Users")
 
 const CommissionOrders = db.define(
   "commissionOrders",
@@ -22,21 +21,21 @@ const CommissionOrders = db.define(
       },
       onDelete: "SET NULL",
     },
-    artistId: {
+    providerId: {
       type: DataTypes.BIGINT,
       allowNull: true,
       references: {
-        model: ArtistProfiles,
-        key: "userId",
+        model: Users,
+        key: "id",
       },
       onDelete: "SET NULL",
     },
-    clientId: {
+    recipientId: {
       type: DataTypes.BIGINT,
       allowNull: true,
       references: {
-        model: ClientProfiles,
-        key: "userId",
+        model: Users,
+        key: "id",
       },
       onDelete: "SET NULL",
     },
@@ -89,7 +88,7 @@ const CommissionOrders = db.define(
         },
       },
     },
-    clientRequestDetails: {
+    recipientRequestDetails: {
       type: DataTypes.TEXT,
       allowNull: false,
       validate: {
@@ -101,18 +100,18 @@ const CommissionOrders = db.define(
         },
       },
     },
-    artistSubmissionUrl: {
+    providerSubmissionUrl: {
       type: DataTypes.TEXT,
       allowNull: true,
       validate: {
         isUrl: { msg: "Artist submission URL must be a valid URL." },
       },
     },
-    artistSubmissionDate: {
+    providerSubmissionDate: {
       type: DataTypes.DATE,
       allowNull: true,
     },
-    clientConfirmationDate: {
+    recipientConfirmationDate: {
       type: DataTypes.DATE,
       allowNull: true,
     },
@@ -133,13 +132,13 @@ const CommissionOrders = db.define(
     timestamps: true,
     indexes: [
       { fields: ["listingId"], name: "commission_orders_listing_id_idx" },
-      { fields: ["artistId"], name: "commission_orders_artist_id_idx" },
-      { fields: ["clientId"], name: "commission_orders_client_id_idx" },
+      { fields: ["providerId"], name: "commission_orders_provider_id_idx" },
+      { fields: ["recipientId"], name: "commission_orders_recipient_id_idx" },
       { fields: ["status"], name: "commission_orders_status_idx" },
       { fields: ["paymentStatus"], name: "commission_orders_payment_status_idx" },
       { fields: ['createdAt'], name: 'commission_orders_created_at_idx' },
     ]
   }
 );
-
 module.exports = CommissionOrders;
+

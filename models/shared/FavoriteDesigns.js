@@ -1,23 +1,23 @@
 const { DataTypes } = require("sequelize");
 const db = require("./../../server");
-const ClientProfiles = require("./ClientProfiles");
+const Users = require("./../shared/Users")
 const TattooDesigns = require("./../artists/TattooDesigns");
 
-const ClientFavoriteDesigns = db.define(
-  "clientFavoriteDesigns",
+const FavoriteDesigns = db.define(
+  "favoriteDesigns",
   {
-    clientId: {
+    userId: {
       type: DataTypes.BIGINT,
       primaryKey: true,
       allowNull: false,
       validate: {
         notNull: {
-          msg: "A favorite must be linked to a client profile",
+          msg: "A favorite must be linked to a profile",
         },
       },
       references: {
-        model: ClientProfiles,
-        key: "userId",
+        model: Users,
+        key: "id",
       },
       onDelete: "CASCADE",
     },
@@ -47,22 +47,24 @@ const ClientFavoriteDesigns = db.define(
     indexes: [
       {
         unique: true,
-        fields: ["clientId", "designId"],
+        fields: ["userId", "designId"],
+        name: "unique_user_design_favorite"
       },
       {
-        fields: ["clientId"],
-        name: "idx_client_favorite_designs_by_client_id",
+        fields: ["userId"],
+        name: "idx_user_favorite_designs_by_id",
       },
       {
         fields: ["designId"],
-        name: "idx_client_favorite_designs_by_design_id",
+        name: "idx_user_favorite_designs_by_design_id",
       },
       {
         fields: ["favoritedAt"],
-        name: "client_favorite_designs_favorited_at_idx",
+        name: "user_favorite_designs_favorited_at_idx",
       },
     ],
   }
 );
 
-module.exports = ClientFavoriteDesigns;
+module.exports = FavoriteDesigns;
+

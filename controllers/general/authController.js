@@ -201,7 +201,6 @@ exports.signup = catchAsync(async (req, res, next) => {
     passwordConfirm,
     role,
     displayName,
-    bio,
     city,
     state,
     zipcode,
@@ -230,11 +229,15 @@ exports.signup = catchAsync(async (req, res, next) => {
     );
   }
 
-  if (!["artist", "client"].includes(role)) {
+  if (!["artist", "user"].includes(role)) {
     return next(new AppError("Invalid user role specified.", 400));
   }
 
-  if (role === "artist" && (!displayName || !city || !state || !zipcode)) {
+  if (!displayName) {
+    return next(new AppError("Please provide a display name"), 400);
+  }
+
+  if (role === "artist" && (!city || !state || !zipcode)) {
     return next(
       new AppError(
         "Please provide display name, city, state, and zipcode for artist registration.",
@@ -250,6 +253,7 @@ exports.signup = catchAsync(async (req, res, next) => {
       {
         email: email.toLowerCase(),
         passwordHash: password,
+        displayName: displayName,
         role,
         isActive: true,
         verifiedEmail: false,
@@ -260,6 +264,7 @@ exports.signup = catchAsync(async (req, res, next) => {
     await EmailPreference.create({ userId: newUser.id }, { transaction: t });
 
     const ipAddress = normalizeIpAddress(req.ip);
+
     await TOSAgreement.create(
       {
         userId: newUser.id,
@@ -271,11 +276,9 @@ exports.signup = catchAsync(async (req, res, next) => {
     );
 
     if (role === "artist") {
-      await ArtistProfiles.create(
+      await ArtistDetails.create(
         {
           userId: newUser.id,
-          displayName,
-          bio: bio || null,
           city,
           state,
           zipcode,
@@ -285,21 +288,12 @@ exports.signup = catchAsync(async (req, res, next) => {
       );
     }
 
-    if (role === "client") {
-      await ClientProfiles.create(
-        {
-          userId: newUser.id,
-          displayName: displayName || null,
-          bio: bio || null,
-        },
-        { transaction: t }
-      );
-    }
-
     await t.commit();
+
     return createSendToken(newUser, 201, req, res);
   } catch (error) {
     await t.rollback();
+
     if (error.name === "SequelizeUniqueConstraintError") {
       return next(
         new AppError(
@@ -317,6 +311,7 @@ exports.signup = catchAsync(async (req, res, next) => {
         new AppError(`Invalid input data: ${errors.join(". ")}`, 400)
       );
     }
+
     return next(error);
   }
 });
