@@ -726,11 +726,57 @@ exports.requestAccountReactivation = catchAsync(async (req, res, next) => {
  * @description Re-enables a deactivated profile.
  * @returns {Function} An Express middleware function.
  */
-exports.reactivateProfile = catchAsync(async (req, res, next) => {});
+exports.reactivateProfile = catchAsync(async (req, res, next) => {
+  const { token } = req.body;
+  if (!req.user) {
+    return next(new AppError("User not found in request. Please log in.", 401));
+  }
+
+  const user = await Users.findByPk(req.user.id);
+  if (!user) {
+    return next(new AppError("Couldn't find the logged in user.", 404));
+  }
+
+  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+  if (
+    user.reactivateAccountToken !== hashedToken ||
+    Date.now() > user.reactivateAccountExpires
+  ) {
+    return next(new AppError("Token is invalid or has expired.", 400));
+  }
+
+  user.isActive = true;
+  user.reactivateAccountToken = undefined;
+  user.reactivateAccountExpires = undefined;
+  await user.save();
+
+  createSendToken(user, 200, req, res);
+});
 
 /**
  * @function deleteProfile
  * @description Permanent hard delete on the signed in user.
  * @returns {Function} An Express middleware function.
  */
-exports.deleteProfile = catchAsync(async (req, res, next) => {});
+exports.deleteProfile = catchAsync(async (req, res, next) => {
+  if (!req.user) {
+    return next(new AppError("User not found in request. Please log in.", 401));
+  }
+
+  const user = await Users.findByPk(req.user.id);
+  if (!user) {
+    return next(new AppError("Couldn't find the logged in user.", 404));
+  }
+
+  await user.destroy()
+
+  res.cookie("jwt", "deleted", {
+    expires: new Date(Date.now() + 10 * 1000),
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+  });
+
+  res
+    .status(200)
+    .json({ status: "success", message: "Deleted profile successfully." });
+});
