@@ -1,7 +1,8 @@
 const { DataTypes } = require("sequelize");
 const db = require("./../../server");
+const Users = require("./Users");
 
-const Users = db.define(
+const Notifications = db.define(
   "notifications",
   {
     id: {
@@ -59,4 +60,4 @@ const Users = db.define(
   }
 );
 
-module.exports = Notification;
+module.exports = Notifications;

@@ -4,6 +4,8 @@ describe("users model", () => {
   describe("hooks", () => {
     it("does not hash password if passwordHash is not changed", async () => {
       const user = await Users.create({
+        firstName: "tests",
+        lastName: "userson",
         email: "static@example.com",
         passwordHash: "unchanged-password",
         role: "user",

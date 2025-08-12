@@ -93,7 +93,7 @@ describe("Auth API Unit Tests", () => {
       expect(next).toHaveBeenCalledWith(expect.any(AppError));
 
       const err = next.mock.calls[0][0];
-      expect(err.message).toMatch(/Please provide email/);
+      expect(err.message).toMatch(/Please provide first/);
       expect(err.statusCode).toBe(400);
     });
 
@@ -102,6 +102,8 @@ describe("Auth API Unit Tests", () => {
 
       const req = {
         body: {
+          firstName: "firstName",
+          lastName: "lastName",
           email: "test@example.com",
           password: "password123",
           passwordConfirm: "password1234",
@@ -126,6 +128,8 @@ describe("Auth API Unit Tests", () => {
     it("should prevent registration of an admin role", async () => {
       const req = {
         body: {
+          firstName: "firstName",
+          lastName: "lastName",
           email: "admin@example.com",
           password: "password123",
           passwordConfirm: "password123",
@@ -149,6 +153,8 @@ describe("Auth API Unit Tests", () => {
       jest.spyOn(db, "transaction");
       const req = {
         body: {
+          firstName: "firstName",
+          lastName: "lastName",
           email: "invalidrole@example.com",
           password: "password123",
           passwordConfirm: "password123",
@@ -176,6 +182,8 @@ describe("Auth API Unit Tests", () => {
     it("should prevent registration of an artist with missing required profile fields", async () => {
       const req = {
         body: {
+          firstName: "firstName",
+          lastName: "lastName",
           email: "artist@example.com",
           password: "password123",
           passwordConfirm: "password123",
@@ -194,9 +202,7 @@ describe("Auth API Unit Tests", () => {
       await authController.signup(req, res, next);
 
       expect(next).toHaveBeenCalledWith(expect.any(AppError));
-      expect(next.mock.calls[0][0].message).toMatch(
-        /city, state, and zipcode/
-      );
+      expect(next.mock.calls[0][0].message).toMatch(/city, state, and zipcode/);
 
       expect(res.status).not.toHaveBeenCalled();
       expect(res.json).not.toHaveBeenCalled();
@@ -208,6 +214,8 @@ describe("Auth API Unit Tests", () => {
     it("should handle a SequelizeUniqueConstraintError", async () => {
       const req = mockRequest({
         body: {
+          firstName: "firstName",
+          lastName: "lastName",
           email: "duplicate@example.com",
           password: "Password123!",
           passwordConfirm: "Password123!",
@@ -219,12 +227,14 @@ describe("Auth API Unit Tests", () => {
       const next = jest.fn();
 
       await Users.create({
+        firstName: "firstName",
+        lastName: "lastName",
         email: "duplicate@example.com",
         passwordHash: "hashedpsddewor",
         role: "user",
         isActive: true,
         verifiedEmail: false,
-        displayName: "sequelizeuniqueconstraintuser2"
+        displayName: "sequelizeuniqueconstraintuser2",
       });
 
       await new Promise((resolve) => {
@@ -246,6 +256,8 @@ describe("Auth API Unit Tests", () => {
     it("should handle a SequelizeValidationError", async () => {
       const req = mockRequest({
         body: {
+          firstName: "firstName",
+          lastName: "lastName",
           email: "invalid-email",
           password: "Password123!",
           passwordConfirm: "Password123!",
@@ -279,6 +291,8 @@ describe("Auth API Unit Tests", () => {
     it("should handle a general error during transaction", async () => {
       const req = mockRequest({
         body: {
+          firstName: "firstName",
+          lastName: "lastName",
           email: "test@example.com",
           password: "Password123!",
           passwordConfirm: "Password123!",
@@ -377,6 +391,8 @@ describe("Auth API Unit Tests", () => {
 
       const mockUser = {
         id: 1,
+        firstName: "firstName",
+        lastName: "lastName",
         email: "valid@example.com",
         passwordHash: "hashedpassword",
         correctPassword: jest.fn().mockResolvedValue(false),

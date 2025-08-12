@@ -261,9 +261,9 @@ exports.signup = catchAsync(async (req, res, next) => {
   }
 
   const t = await db.transaction();
-
+  let newUser
   try {
-    const newUser = await Users.create(
+    newUser = await Users.create(
       {
         firstName: firstName,
         lastName: lastName,
@@ -292,7 +292,7 @@ exports.signup = catchAsync(async (req, res, next) => {
     );
 
     if (role === "artist") {
-      await ArtistDetails.create(
+      newUser = await ArtistDetails.create(
         {
           userId: newUser.id,
           city,
@@ -304,14 +304,14 @@ exports.signup = catchAsync(async (req, res, next) => {
       );
     }
 
-    await t.commit();
-
     const welcome = new Welcome({
       recipient: newUser.email,
       firstName: newUser.firstName,
     });
 
     await welcome.sendWelcome();
+
+    await t.commit();
 
     return createSendToken(newUser, 201, req, res);
   } catch (error) {
@@ -768,7 +768,7 @@ exports.deleteProfile = catchAsync(async (req, res, next) => {
     return next(new AppError("Couldn't find the logged in user.", 404));
   }
 
-  await user.destroy()
+  await user.destroy();
 
   res.cookie("jwt", "deleted", {
     expires: new Date(Date.now() + 10 * 1000),

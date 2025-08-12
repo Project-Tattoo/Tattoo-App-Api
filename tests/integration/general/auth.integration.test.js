@@ -20,12 +20,14 @@ describe("Auth API Integration Tests", () => {
   describe("Signup", () => {
     it("should register a new user successfully", async () => {
       const res = await request(app).post("/api/v1/auth/signup").send({
-        email: "testclient@example.com",
-        password: "password123",
-        passwordConfirm: "password123",
+        firstName: "test",
+        lastName: "user",
+        email: "registrationuser@example.com",
+        password: "testpass123",
+        passwordConfirm: "testpass123",
         role: "user",
-        displayName: "Test User",
-        bio: "A user interested in tattoos.",
+        displayName: "registration test User",
+        bio: "Test bio",
       });
 
       expect(res.statusCode).toEqual(201);
@@ -68,6 +70,8 @@ describe("Auth API Integration Tests", () => {
       const res = await request(app)
         .post("/api/v1/auth/signup")
         .send({
+          firstName: "test",
+          lastName: "user",
           email: "testartist@example.com",
           password: "artistpassword123",
           passwordConfirm: "artistpassword123",
@@ -76,7 +80,7 @@ describe("Auth API Integration Tests", () => {
           state: "NY",
           zipcode: "10001",
           stylesOffered: ["Traditional", "Realism"],
-          displayName:"newArtist"
+          displayName: "newArtist",
         });
 
       expect(res.statusCode).toEqual(201);
@@ -105,6 +109,8 @@ describe("Auth API Integration Tests", () => {
 
     it("should prevent registration with an existing email", async () => {
       const payload = {
+        firstName: "test",
+        lastName: "user",
         email: "duplicate@example.com",
         password: "testpass123",
         passwordConfirm: "testpass123",
@@ -128,6 +134,8 @@ describe("Auth API Integration Tests", () => {
 
     it("should prevent registration with missing mandatory fields", async () => {
       const res = await request(app).post("/api/v1/auth/signup").send({
+        firstName: "test",
+        lastName: "user",
         email: "",
         password: "somepassword",
         passwordConfirm: "somepassword",
@@ -139,6 +147,8 @@ describe("Auth API Integration Tests", () => {
 
     it("should prevent registration with passwords that don't match", async () => {
       const res = await request(app).post("/api/v1/auth/signup").send({
+        firstName: "test",
+        lastName: "user",
         email: "mismatch@example.com",
         password: "password123",
         passwordConfirm: "differentPassword123",
@@ -153,6 +163,8 @@ describe("Auth API Integration Tests", () => {
 
     it("should prevent registration if role is not valid", async () => {
       const res = await request(app).post("/api/v1/auth/signup").send({
+        firstName: "test",
+        lastName: "user",
         email: "invalidrole@example.com",
         password: "password123",
         passwordConfirm: "password123",
@@ -167,6 +179,8 @@ describe("Auth API Integration Tests", () => {
 
     it("should prevent an attempt to sign up as an admin", async () => {
       const res = await request(app).post("/api/v1/auth/signup").send({
+        firstName: "test",
+        lastName: "user",
         email: "adminsignup@example.com",
         password: "adminpassword",
         passwordConfirm: "adminpassword",
@@ -183,11 +197,13 @@ describe("Auth API Integration Tests", () => {
 
     it("should prevent an artist registration with missing required fields", async () => {
       const res = await request(app).post("/api/v1/auth/signup").send({
+        firstName: "test",
+        lastName: "user",
         email: "artistmissing@example.com",
         password: "password123",
         passwordConfirm: "password123",
         role: "artist",
-        displayName:"artistregistration"
+        displayName: "artistregistration",
       });
 
       expect(res.statusCode).toBe(400);
@@ -200,6 +216,8 @@ describe("Auth API Integration Tests", () => {
   describe("Login", () => {
     it("should successfully login a created user", async () => {
       await request(app).post("/api/v1/auth/signup").send({
+        firstName: "test",
+        lastName: "user",
         email: "logintest@example.com",
         password: "testpass123",
         passwordConfirm: "testpass123",
@@ -223,6 +241,8 @@ describe("Auth API Integration Tests", () => {
       console.log("about to create user for test");
 
       const user = await request(app).post("/api/v1/auth/signup").send({
+        firstName: "test",
+        lastName: "user",
         email: "wrongpass@example.com",
         password: "correctpassword123",
         passwordConfirm: "correctpassword123",
