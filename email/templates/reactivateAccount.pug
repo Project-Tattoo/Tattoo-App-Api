@@ -1,0 +1,16 @@
+doctype html
+html
+  head
+    meta(charset="utf-8")
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    title Reactivate Your Account
+  body
+    h2 Hello #{firstName || 'User'},
+    p We received a request to reactivate your account. If this was you, please click the secure link below to reactivate your account:
+    p
+      a(href=reactivateUrl) Reactivate my account
+    p This link will expire in 10 minutes for your security.
+    p If you did not request this, please ignore this email and your account will remain deactivated.
+    hr
+    p Thanks,
+    p The AppName Team

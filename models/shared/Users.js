@@ -18,6 +18,16 @@ const Users = db.define(
       unique: true,
       allowNull: false,
     },
+    firstName: {
+      type: DataTypes.STRING,
+      required: true,
+      allowNull: false,
+    },
+    lastName: {
+      type: DataTypes.STRING,
+      required: true,
+      allowNull: false,
+    },
     email: {
       type: DataTypes.STRING,
       allowNull: false,
@@ -117,6 +127,10 @@ const Users = db.define(
     passwordChangedAt: DataTypes.DATE,
     passwordResetToken: DataTypes.STRING,
     passwordResetExpires: DataTypes.DATE,
+    emailChangeToken: DataTypes.STRING,
+    emailChangeExpires: DataTypes.DATE,
+    reactivateAccountToken: DataTypes.STRING,
+    reactivateAccountExpires: DataTypes.DATE,
     role: {
       type: DataTypes.ENUM("artist", "user", "admin"),
       allowNull: false,
@@ -230,6 +244,26 @@ Users.prototype.createPasswordResetToken = async function () {
     .update(resetToken)
     .digest("hex");
   this.passwordResetExpires = Date.now() + 10 * 60 * 1000;
+  return resetToken;
+};
+
+Users.prototype.createReactivateAccountToken = async function () {
+  const resetToken = crypto.randomBytes(32).toString("hex");
+  this.reactivateAccountToken = crypto
+    .createHash("sha256")
+    .update(resetToken)
+    .digest("hex");
+  this.reactivateAccountExpires = Date.now() + 10 * 60 * 1000;
+  return resetToken;
+};
+
+Users.prototype.createEmailChangeToken = async function () {
+  const resetToken = crypto.randomBytes(32).toString("hex");
+  this.emailChangeToken = crypto
+    .createHash("sha256")
+    .update(resetToken)
+    .digest("hex");
+  this.emailChangeExpires = Date.now() + 10 * 60 * 1000;
   return resetToken;
 };
 

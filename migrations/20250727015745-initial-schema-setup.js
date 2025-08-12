@@ -30,6 +30,16 @@ module.exports = {
         unique: true,
         allowNull: false,
       },
+      firstName: {
+        type: DataTypes.STRING,
+        required: true,
+        allowNull: false,
+      },
+      lastName: {
+        type: DataTypes.STRING,
+        required: true,
+        allowNull: false,
+      },
       email: { type: DataTypes.STRING, unique: true, allowNull: false },
       passwordHash: { type: DataTypes.STRING, allowNull: false },
       stripeCustomerId: { type: DataTypes.STRING, allowNull: false },
@@ -473,20 +483,20 @@ module.exports = {
       updatedAt: { type: DataTypes.DATE, allowNull: false },
     });
 
-    await queryInterface.addIndex("collections", ["publicId"], {
+    await queryInterface.addIndex("portfolioCollections", ["publicId"], {
       unique: true,
       name: "collections_public_id_unique_idx",
     });
-    await queryInterface.addIndex("collections", ["artistId"], {
+    await queryInterface.addIndex("portfolioCollections", ["artistId"], {
       name: "collections_artist_id_idx",
     });
-    await queryInterface.addIndex("collections", ["name"], {
+    await queryInterface.addIndex("portfolioCollections", ["name"], {
       name: "collections_name_idx",
     });
-    await queryInterface.addIndex("collections", ["totalViews"], {
+    await queryInterface.addIndex("portfolioCollections", ["totalViews"], {
       name: "collections_total_views_idx",
     });
-    await queryInterface.addIndex("collections", ["createdAt"], {
+    await queryInterface.addIndex("portfolioCollections", ["createdAt"], {
       name: "collections_created_at_idx",
     });
 
@@ -496,7 +506,7 @@ module.exports = {
         type: DataTypes.BIGINT,
         primaryKey: true,
         allowNull: false,
-        references: { model: "collections", key: "id" },
+        references: { model: "portfolioCollections", key: "id" },
         onDelete: "CASCADE",
       },
       designId: {
@@ -817,7 +827,7 @@ module.exports = {
         type: Sequelize.BIGINT,
         allowNull: false,
         references: {
-          model: "Users",
+          model: "users",
           key: "id",
         },
         onDelete: "CASCADE",
@@ -884,7 +894,7 @@ module.exports = {
         type: Sequelize.BIGINT,
         allowNull: false,
         references: {
-          model: "Users",
+          model: "users",
           key: "id",
         },
         onDelete: "CASCADE",
@@ -981,7 +991,7 @@ module.exports = {
     await queryInterface.dropTable("favoriteDesigns");
     await queryInterface.dropTable("commissionListings");
     await queryInterface.dropTable("collectionDesigns");
-    await queryInterface.dropTable("collections");
+    await queryInterface.dropTable("portfolioCollections");
     await queryInterface.dropTable("tattooDesigns");
     await queryInterface.dropTable("verificationApplications");
     await queryInterface.dropTable("artistDetails");

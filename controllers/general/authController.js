@@ -9,6 +9,12 @@ const TOSAgreement = require("./../../models/shared/TOSAgreement");
 const ArtistDetails = require("./../../models/artists/ArtistDetails");
 const db = require("./../../server");
 const { Sequelize } = require("sequelize");
+const PasswordReset = require("./../../email/classes/passwordReset");
+const PasswordChange = require("./../../email/classes/passwordChange");
+const PasswordUpdated = require("./../../email/classes/passwordUpdated");
+const Welcome = require("./../../email/classes/welcome");
+const EmailChange = require("./../../email/classes/emailChange");
+const EmailUpdated = require("./../../email/classes/emailUpdated");
 
 //////////////////////// JWT LOGIC ////////////////////////
 
@@ -196,6 +202,8 @@ const normalizeIpAddress = (ip) => {
 exports.signup = catchAsync(async (req, res, next) => {
   const {
     email,
+    firstName,
+    lastName,
     password,
     passwordConfirm,
     role,
@@ -206,10 +214,17 @@ exports.signup = catchAsync(async (req, res, next) => {
     stylesOffered,
   } = req.body;
 
-  if (!email || !password || !passwordConfirm || !role) {
+  if (
+    !email ||
+    !password ||
+    !passwordConfirm ||
+    !role ||
+    !firstName ||
+    !lastName
+  ) {
     return next(
       new AppError(
-        "Please provide email, password, password confirmation, and role.",
+        "Please provide first name, last name, email, password, password confirmation, and role.",
         400
       )
     );
@@ -250,6 +265,8 @@ exports.signup = catchAsync(async (req, res, next) => {
   try {
     const newUser = await Users.create(
       {
+        firstName: firstName,
+        lastName: lastName,
         email: email.toLowerCase(),
         passwordHash: password,
         displayName: displayName,
@@ -288,6 +305,13 @@ exports.signup = catchAsync(async (req, res, next) => {
     }
 
     await t.commit();
+
+    const welcome = new Welcome({
+      recipient: newUser.email,
+      firstName: newUser.firstName,
+    });
+
+    await welcome.sendWelcome();
 
     return createSendToken(newUser, 201, req, res);
   } catch (error) {
@@ -339,6 +363,14 @@ exports.login = catchAsync(async (req, res, next) => {
 
   if (!user || !(await user.correctPassword(password, user.passwordHash))) {
     return next(new AppError("Incorrect email or password", 401));
+  }
+
+  if (!user.isActive) {
+    return res.status(403).json({
+      status: "fail",
+      message:
+        "Your account has been deactivated. Please check your email to reactivate.",
+    });
   }
 
   createSendToken(user, 200, req, res);
@@ -394,7 +426,14 @@ exports.forgotPassword = catchAsync(async (req, res, next) => {
   await user.save({ validate: false });
 
   try {
-    // REMINDER: add password email logic once email classes are set up
+    const resetUrl = `localhost:3000/reset-password/${resetToken}`;
+    const passwordReset = new PasswordReset({
+      recipient: user.email,
+      resetUrl: resetUrl,
+    });
+
+    await passwordReset.sendPasswordReset();
+
     res.status(200).json({
       status: "success",
       message: "Password reset token sent to email!",
@@ -431,7 +470,15 @@ exports.requestPasswordChange = catchAsync(async (req, res, next) => {
   await user.save({ validate: false });
 
   try {
-    // REMINDER: add password email logic once email classes are set up
+    const resetUrl = `localhost:3000/reset-password/${resetToken}`;
+
+    const passwordChange = new PasswordChange({
+      recipient: user.email,
+      resetUrl: resetUrl,
+    });
+
+    await passwordChange.sendPasswordChange();
+
     res.status(200).json({
       status: "success",
       message: "Password change request token sent to your email!",
@@ -461,7 +508,6 @@ exports.resetPassword = catchAsync(async (req, res, next) => {
     .update(req.query.token)
     .digest("hex");
 
-  console.log("BEFORE USER FIND ONE");
   const user = await Users.findOne({
     where: {
       passwordResetToken: hashedToken,
@@ -470,14 +516,17 @@ exports.resetPassword = catchAsync(async (req, res, next) => {
       },
     },
   });
-  console.log("AFTER USER FIND ONE");
-  console.log(`USER: ${user}`);
 
   if (!user) {
     return next(new AppError("Token is invalid or has expired", 400));
   }
 
-  // REMINDER: Should add email logic to send an email on successful password change, so if it wasnt intentional they can take action
+  const passwordUpdated = new PasswordUpdated({
+    recipient: user.email,
+    firstName: user.firstName,
+  });
+
+  await passwordUpdated.sendPasswordUpdated();
 
   user.passwordHash = req.body.password;
   user.passwordResetToken = undefined;
@@ -505,9 +554,183 @@ exports.updatePassword = catchAsync(async (req, res, next) => {
   if (!isCorrect)
     return next(new AppError("Your current password is wrong.", 401));
 
-  // REMINDER: should add email logic to notify that password has changed
+  const passwordUpdated = new PasswordUpdated({
+    recipient: user.email,
+    firstName: user.firstName,
+  });
+
+  await passwordUpdated.sendPasswordUpdated();
 
   user.passwordHash = req.body.password;
   await user.save();
   createSendToken(user, 200, req, res);
 });
+
+/**
+ * @function requestEmailChange
+ * @description Allows a logged-in user to request to update their email.
+ * @returns {Function} An Express middleware function.
+ */
+exports.requestEmailChange = catchAsync(async (req, res, next) => {
+  if (!req.user) {
+    return next(new AppError("User not found in request. Please log in.", 401));
+  }
+
+  const user = await Users.findByPk(req.user.id);
+  if (!user) {
+    return next(new AppError("Couldn't find the logged in user.", 404));
+  }
+
+  const resetToken = await user.createEmailChangeToken();
+  await user.save({ validate: false });
+
+  try {
+    const secureChangeUrl = `${
+      process.env.FRONTEND_URL || "http://localhost:3000"
+    }/update-email/${encodeURIComponent(resetToken)}`;
+
+    const emailChange = new EmailChange({
+      recipient: user.email,
+      secureChangeUrl,
+    });
+
+    await emailChange.sendEmailChange();
+
+    res.status(200).json({
+      status: "success",
+      message: "Email update request token sent to your email!",
+    });
+  } catch (error) {
+    user.emailChangeToken = undefined;
+    user.emailChangeExpires = undefined;
+    await user.save({ validate: false });
+
+    return next(
+      new AppError(
+        "There was an error while requesting an email update. Please try again later.",
+        500
+      )
+    );
+  }
+});
+
+/**
+ * @function updateEmail
+ * @description Takes in the users new email and updates it in the database.
+ * @returns {Function} An Express middleware function.
+ */
+exports.updateEmail = catchAsync(async (req, res, next) => {
+  const { token, newEmail } = req.body;
+  if (!req.user) {
+    return next(new AppError("User not found in request. Please log in.", 401));
+  }
+
+  const user = await Users.findByPk(req.user.id);
+  if (!user) {
+    return next(new AppError("Couldn't find the logged in user.", 404));
+  }
+
+  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+  if (
+    user.emailChangeToken !== hashedToken ||
+    Date.now() > user.emailChangeExpires
+  ) {
+    return next(new AppError("Token is invalid or has expired.", 400));
+  }
+
+  const oldEmail = user.email;
+
+  user.email = newEmail;
+  user.emailChangeToken = undefined;
+  user.emailChangeExpires = undefined;
+  await user.save();
+
+  await new EmailUpdated({
+    recipient: oldEmail,
+    firstName: user.firstName,
+    newEmail,
+  }).sendEmailUpdated();
+  await new EmailUpdated({
+    recipient: newEmail,
+    firstName: user.firstName,
+    newEmail,
+  }).sendEmailUpdated();
+
+  createSendToken(user, 200, req, res);
+});
+
+/**
+ * @function deactivateProfile
+ * @description Does a soft delete flipping the isActive value.
+ * @returns {Function} An Express middleware function.
+ */
+exports.deactivateProfile = catchAsync(async (req, res, next) => {
+  if (!req.user) {
+    return next(new AppError("User not found in request. Please log in.", 401));
+  }
+
+  const user = await Users.findByPk(req.user.id);
+  if (!user) {
+    return next(new AppError("Couldn't find the logged in user.", 404));
+  }
+
+  user.isActive = false;
+  await user.save({ validate: false });
+
+  res.cookie("jwt", "loggedout", {
+    expires: new Date(Date.now() + 10 * 1000),
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+  });
+
+  res
+    .status(200)
+    .json({ status: "success", message: "Logged out successfully." });
+});
+
+/**
+ * @function requestAccountReactivation
+ * @description Sends an email with a secure link to reactivate a users account.
+ * @returns {Function} An Express middleware function.
+ */
+exports.requestAccountReactivation = catchAsync(async (req, res, next) => {
+  const { email } = req.body;
+  if (!email) return next(new AppError("Please provide your email.", 400));
+
+  const user = await Users.findOne({ where: { email: email.toLowerCase() } });
+  if (!user)
+    return next(new AppError("No account found with that email.", 404));
+
+  if (user.isActive) {
+    return next(new AppError("Account is already active.", 400));
+  }
+
+  const token = user.createReactivateAccountToken();
+  await user.save({ validate: false });
+
+  const reactivationUrl = `${process.env.FRONTEND_URL}/reactivate-account/${token}`;
+  await new ReactivateAccountEmail({
+    recipient: user.email,
+    firstName: user.firstName,
+    reactivationUrl,
+  }).send();
+
+  res.status(200).json({
+    status: "success",
+    message: "Reactivation link sent to your email.",
+  });
+});
+
+/**
+ * @function reactivateProfile
+ * @description Re-enables a deactivated profile.
+ * @returns {Function} An Express middleware function.
+ */
+exports.reactivateProfile = catchAsync(async (req, res, next) => {});
+
+/**
+ * @function deleteProfile
+ * @description Permanent hard delete on the signed in user.
+ * @returns {Function} An Express middleware function.
+ */
+exports.deleteProfile = catchAsync(async (req, res, next) => {});
