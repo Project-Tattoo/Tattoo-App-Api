@@ -26,19 +26,19 @@ describe("Auth API Integration Tests", () => {
         password: "testpass123",
         passwordConfirm: "testpass123",
         role: "user",
-        displayName: "registration test User",
+        displayName: "Test User",
         bio: "Test bio",
       });
 
       expect(res.statusCode).toEqual(201);
       expect(res.body.status).toEqual("success");
       expect(res.body.token).toBeDefined();
-      expect(res.body.data.user.email).toEqual("testclient@example.com");
+      expect(res.body.data.user.email).toEqual("registrationuser@example.com");
       expect(res.body.data.user.role).toEqual("user");
       expect(res.body.data.user.publicId).toBeDefined();
 
       const userInDb = await Users.findOne({
-        where: { email: "testclient@example.com" },
+        where: { email: "registrationuser@example.com" },
       });
       expect(userInDb).toBeDefined();
       expect(userInDb.role).toEqual("user");

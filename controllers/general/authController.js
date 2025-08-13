@@ -261,9 +261,8 @@ exports.signup = catchAsync(async (req, res, next) => {
   }
 
   const t = await db.transaction();
-  let newUser
   try {
-    newUser = await Users.create(
+    let newUser = await Users.create(
       {
         firstName: firstName,
         lastName: lastName,
@@ -292,7 +291,7 @@ exports.signup = catchAsync(async (req, res, next) => {
     );
 
     if (role === "artist") {
-      newUser = await ArtistDetails.create(
+      const artistDetails = await ArtistDetails.create(
         {
           userId: newUser.id,
           city,
@@ -304,12 +303,17 @@ exports.signup = catchAsync(async (req, res, next) => {
       );
     }
 
-    const welcome = new Welcome({
-      recipient: newUser.email,
-      firstName: newUser.firstName,
-    });
+    try {
+      const welcome = new Welcome({
+        recipient: newUser.email,
+        firstName: newUser.firstName,
+      });
 
-    await welcome.sendWelcome();
+      await welcome.sendWelcome();
+      console.log(`Welcome email sent to ${newUser.email}`);
+    } catch (emailError) {
+      console.error("Failed to send welcome email:", emailError);
+    }
 
     await t.commit();
 
@@ -545,24 +549,39 @@ exports.updatePassword = catchAsync(async (req, res, next) => {
   if (!req.user) {
     return next(new AppError("User not found in request. Please log in.", 401));
   }
+
+  if (!req.body.password) {
+    return next(new AppError("New password cannot be null.", 400));
+  }
+
   const user = await Users.findByPk(req.user.id);
 
   const isCorrect = await user.correctPassword(
     req.body.passwordCurrent,
     user.passwordHash
   );
-  if (!isCorrect)
+  if (!isCorrect) {
     return next(new AppError("Your current password is wrong.", 401));
-
-  const passwordUpdated = new PasswordUpdated({
-    recipient: user.email,
-    firstName: user.firstName,
-  });
-
-  await passwordUpdated.sendPasswordUpdated();
+  }
 
   user.passwordHash = req.body.password;
   await user.save();
+
+  // if (process.env.NODE_ENV !== "test") {
+  try {
+    const passwordUpdated = new PasswordUpdated({
+      recipient: user.email,
+      firstName: user.firstName,
+    });
+    await passwordUpdated.sendPasswordUpdated();
+    console.log(`Password updated email sent to ${user.email}`);
+  } catch (emailError) {
+    console.error("Failed to send password updated email:", emailError);
+  }
+  // } else {
+  //   console.log("Skipping password updated email in test environment.");
+  // }
+
   createSendToken(user, 200, req, res);
 });
 

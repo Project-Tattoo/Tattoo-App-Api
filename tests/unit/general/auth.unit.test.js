@@ -922,7 +922,11 @@ describe("Auth API Unit Tests", () => {
 
       const req = {
         user: { id: 1 },
-        body: { passwordCurrent: "wrongpassword" },
+        body: {
+          passwordCurrent: "wrongpassword",
+          // ADD THIS LINE
+          password: "new-password",
+        },
       };
       const res = mockResponse();
       const next = jest.fn();
