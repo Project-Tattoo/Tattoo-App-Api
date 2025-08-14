@@ -1,6 +1,6 @@
-const errorHandler = require("./../../../controllers/general/errorController");
-const AppError = require("./../../../utils/appError");
-const { mockRequest, mockResponse } = require("./../../utils/mockExpress");
+const errorHandler = require("../../../controllers/general/errorController");
+const AppError = require("../../../utils/appError");
+const { mockRequest, mockResponse } = require("../../utils/mockExpress");
 
 describe("errorController", () => {
   const originalEnv = process.env;
