@@ -17,6 +17,7 @@ module.exports = {
   collectCoverageFrom: [
     "**/models/**/*.js", // Include all model files
     "**/controllers/**/*.js", // Include all controller files
+    "**/email/classes/*.js", // Include all email classes
     "!**/node_modules/**", // Exclude node_modules
     "!**/coverage/**", // Exclude coverage directory
     "!**/jest.config.js", // Exclude Jest config file

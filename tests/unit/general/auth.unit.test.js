@@ -13,6 +13,12 @@ const { Sequelize } = require("sequelize");
 const mockSequelizeUniqueConstraintError = require("../../utils/mockSequelizeUniqueConstraintError");
 const mockSequelizeValidationError = require("../../utils/mockSequelizeValidationError");
 const { mockRequest, mockResponse } = require("./../../utils/mockExpress");
+const PasswordReset = require("./../../../email/classes/passwordReset");
+const PasswordChange = require("./../../../email/classes/passwordChange");
+const PasswordUpdated = require("./../../../email/classes/passwordUpdated");
+const ReactivateAccount = require("./../../../email/classes/reactivateAccount");
+const EmailChange = require("./../../../email/classes/emailChange");
+const EmailUpdated = require("./../../../email/classes/emailUpdated");
 
 require("dotenv").config({ path: "./.env.test" });
 
@@ -70,6 +76,20 @@ describe("Auth API Unit Tests", () => {
       clearCookie: jest.fn(),
     };
     next = jest.fn();
+    jest
+      .spyOn(PasswordReset.prototype, "sendPasswordReset")
+      .mockResolvedValue();
+    jest
+      .spyOn(PasswordChange.prototype, "sendPasswordChange")
+      .mockResolvedValue();
+    jest
+      .spyOn(PasswordUpdated.prototype, "sendPasswordUpdated")
+      .mockResolvedValue();
+    jest
+      .spyOn(ReactivateAccount.prototype, "sendReactivateAccount")
+      .mockResolvedValue();
+    jest.spyOn(EmailChange.prototype, "sendEmailChange").mockResolvedValue();
+    jest.spyOn(EmailUpdated.prototype, "sendEmailUpdated").mockResolvedValue();
   });
 
   afterEach(() => {
@@ -775,14 +795,6 @@ describe("Auth API Unit Tests", () => {
 
       Users.findOne.mockRestore();
     });
-
-    xit("should mock successful createPasswordResetToken and email send", async () => {
-      // Cant implement yet, email logic not set up
-    });
-
-    xit("should mock email sending failure", async () => {
-      // Cant implement yet, email logic not set up
-    });
   });
 
   describe("requestPasswordChange", () => {
@@ -816,14 +828,6 @@ describe("Auth API Unit Tests", () => {
       expect(err.statusCode).toBe(404);
 
       Users.findByPk.mockRestore();
-    });
-
-    xit("should call res.status(200).json(...) when successful", async () => {
-      // Cant implement yet, email logic not set up
-    });
-
-    xit("should fail to send an email when passwordResetToken and passwordResetExpires are undefined", async () => {
-      // Cant implement yet, email logic not set up
     });
   });
 
@@ -894,15 +898,11 @@ describe("Auth API Unit Tests", () => {
       expect(err).toBeInstanceOf(Error);
       Users.findOne.mockRestore();
     });
-
-    xit("should successfully reset a users password", async () => {
-      // Cant implement yet, email logic not set up
-    });
   });
 
   describe("updatePassword", () => {
     it("should call next AppError when req.user is not set", async () => {
-      const req = { user: null }; // or simply {}
+      const req = { user: null };
       const res = mockResponse();
       const next = jest.fn();
 
@@ -924,7 +924,6 @@ describe("Auth API Unit Tests", () => {
         user: { id: 1 },
         body: {
           passwordCurrent: "wrongpassword",
-          // ADD THIS LINE
           password: "new-password",
         },
       };
@@ -987,10 +986,6 @@ describe("Auth API Unit Tests", () => {
       expect(error.message).toMatch(/cannot be null/i);
 
       Users.findByPk.mockRestore();
-    });
-
-    xit("should successfully update password", async () => {
-      // Cant implement yet, email logic not set up
     });
   });
 });

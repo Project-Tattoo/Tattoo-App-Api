@@ -302,17 +302,20 @@ exports.signup = catchAsync(async (req, res, next) => {
         { transaction: t }
       );
     }
+    if (process.env.NODE_ENV !== "test") {
+      try {
+        const welcome = new Welcome({
+          recipient: newUser.email,
+          firstName: newUser.firstName,
+        });
 
-    try {
-      const welcome = new Welcome({
-        recipient: newUser.email,
-        firstName: newUser.firstName,
-      });
-
-      await welcome.sendWelcome();
-      console.log(`Welcome email sent to ${newUser.email}`);
-    } catch (emailError) {
-      console.error("Failed to send welcome email:", emailError);
+        await welcome.sendWelcome();
+        console.log(`Welcome email sent to ${newUser.email}`);
+      } catch (emailError) {
+        console.error("Failed to send welcome email:", emailError);
+      }
+    } else {
+      console.log("Skipping password updated email in test environment.");
     }
 
     await t.commit();
@@ -430,14 +433,17 @@ exports.forgotPassword = catchAsync(async (req, res, next) => {
   await user.save({ validate: false });
 
   try {
-    const resetUrl = `localhost:3000/reset-password/${resetToken}`;
-    const passwordReset = new PasswordReset({
-      recipient: user.email,
-      resetUrl: resetUrl,
-    });
+    if (process.env.NODE_ENV !== "test") {
+      const resetUrl = `localhost:3000/reset-password/${resetToken}`;
+      const passwordReset = new PasswordReset({
+        recipient: user.email,
+        resetUrl: resetUrl,
+      });
 
-    await passwordReset.sendPasswordReset();
-
+      await passwordReset.sendPasswordReset();
+    } else {
+      console.log("Skipping password updated email in test environment.");
+    }
     res.status(200).json({
       status: "success",
       message: "Password reset token sent to email!",
@@ -462,32 +468,36 @@ exports.forgotPassword = catchAsync(async (req, res, next) => {
  * @returns {Function} An Express middleware function.
  */
 exports.requestPasswordChange = catchAsync(async (req, res, next) => {
-  if (!req.user) {
-    return next(new AppError("User not found in request. Please log in.", 401));
-  }
-
-  const user = await Users.findByPk(req.user.id);
-  if (!user)
-    return next(new AppError("Couldn't find the logged in user.", 404));
-
-  const resetToken = await user.createPasswordResetToken();
-  await user.save({ validate: false });
-
   try {
-    const resetUrl = `localhost:3000/reset-password/${resetToken}`;
+    if (!req.user) {
+      return next(
+        new AppError("User not found in request. Please log in.", 401)
+      );
+    }
 
-    const passwordChange = new PasswordChange({
-      recipient: user.email,
-      resetUrl: resetUrl,
-    });
+    const user = await Users.findByPk(req.user.id);
+    if (!user)
+      return next(new AppError("Couldn't find the logged in user.", 404));
 
-    await passwordChange.sendPasswordChange();
+    const resetToken = await user.createPasswordResetToken();
+    await user.save({ validate: false });
 
+    if (process.env.NODE_ENV !== "test") {
+      const resetUrl = `localhost:3000/reset-password/${resetToken}`;
+      const passwordChange = new PasswordChange({
+        recipient: user.email,
+        resetUrl: resetUrl,
+      });
+      await passwordChange.sendPasswordChange();
+    } else {
+      console.log("Skipping password updated email in test environment.");
+    }
     res.status(200).json({
       status: "success",
       message: "Password change request token sent to your email!",
     });
   } catch (error) {
+    console.error("Error caught:", error);
     user.passwordResetToken = undefined;
     user.passwordResetExpires = undefined;
     await user.save({ validate: false });
@@ -507,37 +517,45 @@ exports.requestPasswordChange = catchAsync(async (req, res, next) => {
  * @returns {Function} An Express middleware function.
  */
 exports.resetPassword = catchAsync(async (req, res, next) => {
-  const hashedToken = crypto
-    .createHash("sha256")
-    .update(req.query.token)
-    .digest("hex");
+  try {
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(req.query.token)
+      .digest("hex");
 
-  const user = await Users.findOne({
-    where: {
-      passwordResetToken: hashedToken,
-      passwordResetExpires: {
-        [Sequelize.Op.gt]: Date.now(),
+    const user = await Users.findOne({
+      where: {
+        passwordResetToken: hashedToken,
+        passwordResetExpires: {
+          [Sequelize.Op.gt]: Date.now(),
+        },
       },
-    },
-  });
+    });
 
-  if (!user) {
-    return next(new AppError("Token is invalid or has expired", 400));
+    if (!user) {
+      return next(new AppError("Token is invalid or has expired", 400));
+    }
+
+    user.passwordHash = req.body.password;
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save();
+    if (process.env.NODE_ENV !== "test") {
+      const passwordUpdated = new PasswordUpdated({
+        recipient: user.email,
+        firstName: user.firstName,
+      });
+      await passwordUpdated.sendPasswordUpdated();
+    } else {
+      console.log("Skipping password updated email in test environment.");
+    }
+
+    createSendToken(user, 200, req, res);
+  } catch (error) {
+    return next(
+      new AppError("There was an error while reseting your password", 500)
+    );
   }
-
-  const passwordUpdated = new PasswordUpdated({
-    recipient: user.email,
-    firstName: user.firstName,
-  });
-
-  await passwordUpdated.sendPasswordUpdated();
-
-  user.passwordHash = req.body.password;
-  user.passwordResetToken = undefined;
-  user.passwordResetExpires = undefined;
-  await user.save();
-
-  createSendToken(user, 200, req, res);
 });
 
 /**
@@ -546,43 +564,51 @@ exports.resetPassword = catchAsync(async (req, res, next) => {
  * @returns {Function} An Express middleware function.
  */
 exports.updatePassword = catchAsync(async (req, res, next) => {
-  if (!req.user) {
-    return next(new AppError("User not found in request. Please log in.", 401));
-  }
-
-  if (!req.body.password) {
-    return next(new AppError("New password cannot be null.", 400));
-  }
-
-  const user = await Users.findByPk(req.user.id);
-
-  const isCorrect = await user.correctPassword(
-    req.body.passwordCurrent,
-    user.passwordHash
-  );
-  if (!isCorrect) {
-    return next(new AppError("Your current password is wrong.", 401));
-  }
-
-  user.passwordHash = req.body.password;
-  await user.save();
-
-  // if (process.env.NODE_ENV !== "test") {
   try {
-    const passwordUpdated = new PasswordUpdated({
-      recipient: user.email,
-      firstName: user.firstName,
-    });
-    await passwordUpdated.sendPasswordUpdated();
-    console.log(`Password updated email sent to ${user.email}`);
-  } catch (emailError) {
-    console.error("Failed to send password updated email:", emailError);
-  }
-  // } else {
-  //   console.log("Skipping password updated email in test environment.");
-  // }
+    if (!req.user) {
+      return next(
+        new AppError("User not found in request. Please log in.", 401)
+      );
+    }
 
-  createSendToken(user, 200, req, res);
+    if (!req.body.password) {
+      return next(new AppError("New password cannot be null.", 400));
+    }
+
+    const user = await Users.findByPk(req.user.id);
+
+    const isCorrect = await user.correctPassword(
+      req.body.passwordCurrent,
+      user.passwordHash
+    );
+    if (!isCorrect) {
+      return next(new AppError("Your current password is wrong.", 401));
+    }
+
+    user.passwordHash = req.body.password;
+    await user.save();
+
+    if (process.env.NODE_ENV !== "test") {
+      try {
+        const passwordUpdated = new PasswordUpdated({
+          recipient: user.email,
+          firstName: user.firstName,
+        });
+        await passwordUpdated.sendPasswordUpdated();
+        console.log(`Password updated email sent to ${user.email}`);
+      } catch (emailError) {
+        console.error("Failed to send password updated email:", emailError);
+      }
+    } else {
+      console.log("Skipping password updated email in test environment.");
+    }
+
+    createSendToken(user, 200, req, res);
+  } catch (error) {
+    return next(
+      new AppError("There was an error while updating your password", 500)
+    );
+  }
 });
 
 /**
@@ -591,29 +617,35 @@ exports.updatePassword = catchAsync(async (req, res, next) => {
  * @returns {Function} An Express middleware function.
  */
 exports.requestEmailChange = catchAsync(async (req, res, next) => {
-  if (!req.user) {
-    return next(new AppError("User not found in request. Please log in.", 401));
-  }
-
-  const user = await Users.findByPk(req.user.id);
-  if (!user) {
-    return next(new AppError("Couldn't find the logged in user.", 404));
-  }
-
-  const resetToken = await user.createEmailChangeToken();
-  await user.save({ validate: false });
-
   try {
-    const secureChangeUrl = `${
-      process.env.FRONTEND_URL || "http://localhost:3000"
-    }/update-email/${encodeURIComponent(resetToken)}`;
+    if (!req.user) {
+      return next(
+        new AppError("User not found in request. Please log in.", 401)
+      );
+    }
 
-    const emailChange = new EmailChange({
-      recipient: user.email,
-      secureChangeUrl,
-    });
+    const user = await Users.findByPk(req.user.id);
+    if (!user) {
+      return next(new AppError("Couldn't find the logged in user.", 404));
+    }
 
-    await emailChange.sendEmailChange();
+    const resetToken = await user.createEmailChangeToken();
+    await user.save({ validate: false });
+
+    if (process.env.NODE_ENV !== "test") {
+      const secureChangeUrl = `${
+        process.env.FRONTEND_URL || "http://localhost:3000"
+      }/update-email/${encodeURIComponent(resetToken)}`;
+
+      const emailChange = new EmailChange({
+        recipient: user.email,
+        secureChangeUrl,
+      });
+
+      await emailChange.sendEmailChange();
+    } else {
+      console.log("Skipping password updated email in test environment.");
+    }
 
     res.status(200).json({
       status: "success",
@@ -639,43 +671,55 @@ exports.requestEmailChange = catchAsync(async (req, res, next) => {
  * @returns {Function} An Express middleware function.
  */
 exports.updateEmail = catchAsync(async (req, res, next) => {
-  const { token, newEmail } = req.body;
-  if (!req.user) {
-    return next(new AppError("User not found in request. Please log in.", 401));
+  try {
+    const { token, newEmail } = req.body;
+    if (!req.user) {
+      return next(
+        new AppError("User not found in request. Please log in.", 401)
+      );
+    }
+
+    const user = await Users.findByPk(req.user.id);
+    if (!user) {
+      return next(new AppError("Couldn't find the logged in user.", 404));
+    }
+
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+    if (
+      user.emailChangeToken !== hashedToken ||
+      Date.now() > user.emailChangeExpires
+    ) {
+      return next(new AppError("Token is invalid or has expired.", 400));
+    }
+
+    const oldEmail = user.email;
+
+    user.email = newEmail;
+    user.emailChangeToken = undefined;
+    user.emailChangeExpires = undefined;
+    await user.save();
+    if (process.env.NODE_ENV !== "test") {
+      await new EmailUpdated({
+        recipient: oldEmail,
+        firstName: user.firstName,
+        newEmail,
+      }).sendEmailUpdated();
+      await new EmailUpdated({
+        recipient: newEmail,
+        firstName: user.firstName,
+        newEmail,
+      }).sendEmailUpdated();
+    } else {
+      console.log("Skipping password updated email in test environment.");
+    }
+
+    createSendToken(user, 200, req, res);
+  } catch (error) {
+    new AppError(
+      "There was an error while updating your email. Please try again later.",
+      500
+    );
   }
-
-  const user = await Users.findByPk(req.user.id);
-  if (!user) {
-    return next(new AppError("Couldn't find the logged in user.", 404));
-  }
-
-  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
-  if (
-    user.emailChangeToken !== hashedToken ||
-    Date.now() > user.emailChangeExpires
-  ) {
-    return next(new AppError("Token is invalid or has expired.", 400));
-  }
-
-  const oldEmail = user.email;
-
-  user.email = newEmail;
-  user.emailChangeToken = undefined;
-  user.emailChangeExpires = undefined;
-  await user.save();
-
-  await new EmailUpdated({
-    recipient: oldEmail,
-    firstName: user.firstName,
-    newEmail,
-  }).sendEmailUpdated();
-  await new EmailUpdated({
-    recipient: newEmail,
-    firstName: user.firstName,
-    newEmail,
-  }).sendEmailUpdated();
-
-  createSendToken(user, 200, req, res);
 });
 
 /**
@@ -684,27 +728,36 @@ exports.updateEmail = catchAsync(async (req, res, next) => {
  * @returns {Function} An Express middleware function.
  */
 exports.deactivateProfile = catchAsync(async (req, res, next) => {
-  if (!req.user) {
-    return next(new AppError("User not found in request. Please log in.", 401));
+  try {
+    if (!req.user) {
+      return next(
+        new AppError("User not found in request. Please log in.", 401)
+      );
+    }
+
+    const user = await Users.findByPk(req.user.id);
+    if (!user) {
+      return next(new AppError("Couldn't find the logged in user.", 404));
+    }
+
+    user.isActive = false;
+    await user.save({ validate: false });
+
+    res.cookie("jwt", "loggedout", {
+      expires: new Date(Date.now() + 10 * 1000),
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+    });
+
+    res
+      .status(200)
+      .json({ status: "success", message: "Logged out successfully." });
+  } catch (error) {
+    new AppError(
+      "There was an error while deactivating your account. Please try again later.",
+      500
+    );
   }
-
-  const user = await Users.findByPk(req.user.id);
-  if (!user) {
-    return next(new AppError("Couldn't find the logged in user.", 404));
-  }
-
-  user.isActive = false;
-  await user.save({ validate: false });
-
-  res.cookie("jwt", "loggedout", {
-    expires: new Date(Date.now() + 10 * 1000),
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-  });
-
-  res
-    .status(200)
-    .json({ status: "success", message: "Logged out successfully." });
 });
 
 /**
@@ -713,31 +766,42 @@ exports.deactivateProfile = catchAsync(async (req, res, next) => {
  * @returns {Function} An Express middleware function.
  */
 exports.requestAccountReactivation = catchAsync(async (req, res, next) => {
-  const { email } = req.body;
-  if (!email) return next(new AppError("Please provide your email.", 400));
+  try {
+    const { email } = req.body;
+    if (!email) return next(new AppError("Please provide your email.", 400));
 
-  const user = await Users.findOne({ where: { email: email.toLowerCase() } });
-  if (!user)
-    return next(new AppError("No account found with that email.", 404));
+    const user = await Users.findOne({ where: { email: email.toLowerCase() } });
+    if (!user)
+      return next(new AppError("No account found with that email.", 404));
 
-  if (user.isActive) {
-    return next(new AppError("Account is already active.", 400));
+    if (user.isActive) {
+      return next(new AppError("Account is already active.", 400));
+    }
+
+    const token = user.createReactivateAccountToken();
+    await user.save({ validate: false });
+
+    if (process.env.NODE_ENV !== "test") {
+      const reactivationUrl = `${process.env.FRONTEND_URL}/reactivate-account/${token}`;
+      await new ReactivateAccountEmail({
+        recipient: user.email,
+        firstName: user.firstName,
+        reactivationUrl,
+      }).send();
+    } else {
+      console.log("Skipping password updated email in test environment.");
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: "Reactivation link sent to your email.",
+    });
+  } catch (error) {
+    new AppError(
+      "There was an error while requesting to reactivate your account. Please try again later.",
+      500
+    );
   }
-
-  const token = user.createReactivateAccountToken();
-  await user.save({ validate: false });
-
-  const reactivationUrl = `${process.env.FRONTEND_URL}/reactivate-account/${token}`;
-  await new ReactivateAccountEmail({
-    recipient: user.email,
-    firstName: user.firstName,
-    reactivationUrl,
-  }).send();
-
-  res.status(200).json({
-    status: "success",
-    message: "Reactivation link sent to your email.",
-  });
 });
 
 /**
@@ -746,30 +810,39 @@ exports.requestAccountReactivation = catchAsync(async (req, res, next) => {
  * @returns {Function} An Express middleware function.
  */
 exports.reactivateProfile = catchAsync(async (req, res, next) => {
-  const { token } = req.body;
-  if (!req.user) {
-    return next(new AppError("User not found in request. Please log in.", 401));
+  try {
+    const { token } = req.body;
+    if (!req.user) {
+      return next(
+        new AppError("User not found in request. Please log in.", 401)
+      );
+    }
+
+    const user = await Users.findByPk(req.user.id);
+    if (!user) {
+      return next(new AppError("Couldn't find the logged in user.", 404));
+    }
+
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+    if (
+      user.reactivateAccountToken !== hashedToken ||
+      Date.now() > user.reactivateAccountExpires
+    ) {
+      return next(new AppError("Token is invalid or has expired.", 400));
+    }
+
+    user.isActive = true;
+    user.reactivateAccountToken = undefined;
+    user.reactivateAccountExpires = undefined;
+    await user.save();
+
+    createSendToken(user, 200, req, res);
+  } catch (error) {
+    new AppError(
+      "There was an error while reactivating your account. Please try again later.",
+      500
+    );
   }
-
-  const user = await Users.findByPk(req.user.id);
-  if (!user) {
-    return next(new AppError("Couldn't find the logged in user.", 404));
-  }
-
-  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
-  if (
-    user.reactivateAccountToken !== hashedToken ||
-    Date.now() > user.reactivateAccountExpires
-  ) {
-    return next(new AppError("Token is invalid or has expired.", 400));
-  }
-
-  user.isActive = true;
-  user.reactivateAccountToken = undefined;
-  user.reactivateAccountExpires = undefined;
-  await user.save();
-
-  createSendToken(user, 200, req, res);
 });
 
 /**
@@ -778,24 +851,33 @@ exports.reactivateProfile = catchAsync(async (req, res, next) => {
  * @returns {Function} An Express middleware function.
  */
 exports.deleteProfile = catchAsync(async (req, res, next) => {
-  if (!req.user) {
-    return next(new AppError("User not found in request. Please log in.", 401));
+  try {
+    if (!req.user) {
+      return next(
+        new AppError("User not found in request. Please log in.", 401)
+      );
+    }
+
+    const user = await Users.findByPk(req.user.id);
+    if (!user) {
+      return next(new AppError("Couldn't find the logged in user.", 404));
+    }
+
+    await user.destroy();
+
+    res.cookie("jwt", "deleted", {
+      expires: new Date(Date.now() + 10 * 1000),
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+    });
+
+    res
+      .status(200)
+      .json({ status: "success", message: "Deleted profile successfully." });
+  } catch (error) {
+    new AppError(
+      "There was an error while deleting your account. Please try again later.",
+      500
+    );
   }
-
-  const user = await Users.findByPk(req.user.id);
-  if (!user) {
-    return next(new AppError("Couldn't find the logged in user.", 404));
-  }
-
-  await user.destroy();
-
-  res.cookie("jwt", "deleted", {
-    expires: new Date(Date.now() + 10 * 1000),
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-  });
-
-  res
-    .status(200)
-    .json({ status: "success", message: "Deleted profile successfully." });
 });
