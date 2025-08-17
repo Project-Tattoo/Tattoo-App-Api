@@ -4,7 +4,7 @@ const jwt = require("jsonwebtoken");
 const catchAsync = require("./../../utils/catchAsync");
 const AppError = require("./../../utils/appError");
 const Users = require("./../../models/shared/Users");
-const EmailPreference = require("./../../models/shared/EmailPreferences");
+const EmailPreferences = require("./../../models/shared/EmailPreferences");
 const TOSAgreement = require("./../../models/shared/TOSAgreement");
 const ArtistDetails = require("./../../models/artists/ArtistDetails");
 const db = require("./../../server");
@@ -219,7 +219,7 @@ exports.signup = catchAsync(async (req, res, next) => {
       { transaction: t }
     );
 
-    await EmailPreference.create({ userId: newUser.id }, { transaction: t });
+    await EmailPreferences.create({ userId: newUser.id }, { transaction: t });
 
     const ipAddress = normalizeIpAddress(req.ip);
 
@@ -246,12 +246,13 @@ exports.signup = catchAsync(async (req, res, next) => {
       );
     }
     if (process.env.NODE_ENV !== "test") {
+      console.log("trying to instantiate the email")
       try {
         const welcome = new Welcome({
           recipient: newUser.email,
           firstName: newUser.firstName,
         });
-
+        console.log("trying to send the email")
         await welcome.sendWelcome();
         console.log(`Welcome email sent to ${newUser.email}`);
       } catch (emailError) {
