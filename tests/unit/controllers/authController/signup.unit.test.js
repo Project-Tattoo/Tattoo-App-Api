@@ -3,8 +3,11 @@ const Users = require("./../../../../models/shared/Users");
 const db = require("./../../../../server");
 const AppError = require("../../../../utils/appError");
 const { mockRequest, mockResponse } = require("../../../utils/mockExpress");
-const mockSequelizeUniqueConstraintError = require("./../../../utils/mockSequelizeUniqueConstraintError")
-const mockSequelizeValidationError = require("./../../../utils/mockSequelizeValidationError")
+const mockSequelizeUniqueConstraintError = require("./../../../utils/mockSequelizeUniqueConstraintError");
+const mockSequelizeValidationError = require("./../../../utils/mockSequelizeValidationError");
+const Welcome = require("./../../../../email/classes/welcome");
+const createSendToken = require("./../../../../utils/createSendToken")
+jest.mock("./../../../../email/classes/welcome");
 
 require("dotenv").config({ path: "./.env.test" });
 
@@ -25,6 +28,41 @@ describe("signup", () => {
     req = { body: {}, ip: "127.0.0.1", headers: {}, cookies: {} };
     res = createMockResponse();
     next = jest.fn();
+
+
+    jest
+      .spyOn(createSendTokenModule, "createSendToken")
+      .mockImplementation(() => {
+        return res.status(201).json({
+          status: "success",
+          token: "mock-token",
+          data: { user: { id: "mockUserId", email: "mock@example.com" } },
+        });
+      });
+  });
+
+  beforeAll(() => {
+    jest.spyOn(Users, "create").mockResolvedValue({
+      id: "mockUserId",
+      email: "mock@example.com",
+      firstName: "Mock",
+    });
+    jest.spyOn(db, "transaction").mockResolvedValue({
+      commit: jest.fn().mockResolvedValue(),
+      rollback: jest.fn().mockResolvedValue(),
+    });
+    jest
+      .spyOn(require("./../../../../models/shared/EmailPreferences"), "create")
+      .mockResolvedValue();
+    jest
+      .spyOn(
+        require("./../../../../utils/normalizeIpAddress"),
+        "normalizeIpAddress"
+      )
+      .mockReturnValue("127.0.0.1");
+    jest
+      .spyOn(require("./../../../../models/shared/TOSAgreement"), "create")
+      .mockResolvedValue();
   });
 
   it("should prevent signup with missing fields", async () => {
@@ -113,16 +151,8 @@ describe("signup", () => {
     const res = mockResponse();
     const next = jest.fn();
 
-    await Users.create({
-      firstName: "firstName",
-      lastName: "lastName",
-      email: "duplicate@example.com",
-      passwordHash: "hashedpsddewor",
-      role: "user",
-      isActive: true,
-      verifiedEmail: false,
-      displayName: "duplicateUser2",
-    });
+    const error = mockSequelizeUniqueConstraintError(["email"]);
+    jest.spyOn(Users, "create").mockRejectedValue(error);
 
     await new Promise((resolve) => {
       authController.signup(req, res, (...args) => {
@@ -130,12 +160,11 @@ describe("signup", () => {
         resolve();
       });
     });
-    await new Promise((resolve) => setImmediate(resolve));
 
-    const error = next.mock.calls[0][0];
-    expect(error).toBeInstanceOf(AppError);
-    expect(error.message).toMatch(/duplicate@example\.com/);
-    expect(error.statusCode).toBe(400);
+    const receivedError = next.mock.calls[0][0];
+    expect(receivedError).toBeInstanceOf(AppError);
+    expect(receivedError.message).toMatch(/duplicate@example\.com/);
+    expect(receivedError.statusCode).toBe(400);
   });
 
   it("should handle SequelizeValidationError", async () => {
@@ -150,6 +179,8 @@ describe("signup", () => {
         displayName: "testing2",
       },
     });
+    const res = mockResponse();
+    const next = jest.fn();
 
     const error = mockSequelizeValidationError(["Email format is invalid."]);
     jest.spyOn(Users, "create").mockRejectedValue(error);
@@ -179,6 +210,8 @@ describe("signup", () => {
         displayName: "testUser",
       },
     });
+    const res = mockResponse();
+    const next = jest.fn();
 
     const generalError = new Error("Something went wrong");
     jest.spyOn(Users, "create").mockRejectedValue(generalError);
@@ -192,5 +225,63 @@ describe("signup", () => {
 
     const receivedError = next.mock.calls[0][0];
     expect(receivedError).toBe(generalError);
+  });
+
+  it("should call next with error when displayName is missing", async () => {
+    const req = {
+      body: {
+        firstName: "John",
+        lastName: "Doe",
+        email: "john@example.com",
+        password: "Password123!",
+        passwordConfirm: "Password123!",
+        role: "user",
+      },
+    };
+    const res = mockResponse();
+    const next = jest.fn();
+
+    await authController.signup(req, res, next);
+
+    const err = next.mock.calls[0][0];
+    expect(err).toBeInstanceOf(AppError);
+    expect(err.message).toMatch(/display name/i);
+    expect(err.statusCode).toBe(400);
+  });
+
+  it("should send welcome email when not in test environment", async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = "development";
+
+    const WelcomeMock = require("./../../../../email/classes/welcome");
+    const sendWelcomeMock = jest.fn().mockResolvedValue();
+    WelcomeMock.mockImplementation(() => ({
+      sendWelcome: sendWelcomeMock,
+    }));
+
+    const req = {
+      body: {
+        firstName: "Jane",
+        lastName: "Doe",
+        email: "jane@example.com",
+        password: "Password123!",
+        passwordConfirm: "Password123!",
+        role: "user",
+        displayName: "JaneD",
+      },
+    };
+    const res = mockResponse();
+    const next = jest.fn();
+
+    await authController.signup(req, res, next);
+
+    expect(WelcomeMock).toHaveBeenCalledWith({
+      recipient: "jane@example.com",
+      firstName: "Jane",
+    });
+
+    expect(sendWelcomeMock).toHaveBeenCalled();
+
+    process.env.NODE_ENV = originalNodeEnv;
   });
 });
