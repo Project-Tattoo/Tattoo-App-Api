@@ -4,10 +4,12 @@ describe("users model", () => {
   describe("hooks", () => {
     it("does not hash password if passwordHash is not changed", async () => {
       const user = await Users.create({
+        firstName: "tests",
+        lastName: "userson",
         email: "static@example.com",
         passwordHash: "unchanged-password",
         role: "user",
-        displayName:"passwordhashuser"
+        displayName: "passwordhashuser",
       });
 
       const originalHash = user.passwordHash;
@@ -51,6 +53,32 @@ describe("users model", () => {
       expect(token).toHaveLength(64);
       expect(user.passwordResetToken).not.toBe(token);
       expect(user.passwordResetExpires.getTime()).toBeGreaterThan(Date.now());
+    });
+  });
+
+  describe("createReactivateAccountToken", () => {
+    it("creates and hashes a reactivation token", async () => {
+      const user = Users.build();
+      const token = await user.createReactivateAccountToken();
+      expect(typeof token).toBe("string");
+      expect(token).toHaveLength(64);
+      expect(user.reactivateAccountToken).not.toBe(token);
+      expect(user.reactivateAccountExpires.getTime()).toBeGreaterThan(
+        Date.now()
+      );
+    });
+  });
+
+  describe("createEmailChangeToken", () => {
+    it("creates and hashes a email change token", async () => {
+      const user = Users.build();
+      const token = await user.createEmailChangeToken();
+      expect(typeof token).toBe("string");
+      expect(token).toHaveLength(64);
+      expect(user.emailChangeToken).not.toBe(token);
+      expect(user.emailChangeExpires.getTime()).toBeGreaterThan(
+        Date.now()
+      );
     });
   });
 

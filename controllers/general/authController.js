@@ -4,14 +4,21 @@ const jwt = require("jsonwebtoken");
 const catchAsync = require("./../../utils/catchAsync");
 const AppError = require("./../../utils/appError");
 const Users = require("./../../models/shared/Users");
-const EmailPreference = require("./../../models/shared/EmailPreferences");
+const EmailPreferences = require("./../../models/shared/EmailPreferences");
 const TOSAgreement = require("./../../models/shared/TOSAgreement");
 const ArtistDetails = require("./../../models/artists/ArtistDetails");
 const db = require("./../../server");
 const { Sequelize } = require("sequelize");
+const PasswordReset = require("./../../email/classes/passwordReset");
+const PasswordChange = require("./../../email/classes/passwordChange");
+const PasswordUpdated = require("./../../email/classes/passwordUpdated");
+const Welcome = require("./../../email/classes/welcome");
+const EmailChange = require("./../../email/classes/emailChange");
+const EmailUpdated = require("./../../email/classes/emailUpdated");
+const normalizeIpAddress = require("./../../utils/normalizeIpAddress");
+const createSendToken = require("./../../utils/createSendToken");
 
 //////////////////////// JWT LOGIC ////////////////////////
-
 /**
  * @function validateToken
  * @description Middleware to validate a JWT token from headers or cookies.
@@ -35,6 +42,7 @@ exports.validateToken = catchAsync(async (req, res, next) => {
   try {
     const decoded = await promisify(jwt.verify)(
       token,
+      /* istanbul ignore next */
       process.env.NODE_ENV === "production"
         ? process.env.PROD_JWT_SECRET
         : process.env.DEV_JWT_SECRET
@@ -47,60 +55,6 @@ exports.validateToken = catchAsync(async (req, res, next) => {
       .json({ valid: false, message: "Invalid or expired token." });
   }
 });
-
-/**
- * @function signToken
- * @description Generates a JWT token for a given user ID.
- * @param {number} id - The user's ID.
- * @returns {string} The signed JWT token.
- */
-const signToken = (id) => {
-  return jwt.sign(
-    { id },
-    process.env.NODE_ENV === "production"
-      ? process.env.PROD_JWT_SECRET
-      : process.env.DEV_JWT_SECRET,
-    {
-      expiresIn:
-        process.env.NODE_ENV === "production"
-          ? process.env.PROD_JWT_EXPIRES_IN
-          : process.env.DEV_JWT_EXPIRES_IN,
-    }
-  );
-};
-
-/**
- * @function createSendToken
- * @description Creates a JWT, sets it as a cookie, and sends the response to the client.
- * @param {Object} user - The user object (Sequelize instance).
- * @param {number} statusCode - The HTTP status code to send.
- * @param {Object} req - Express request object.
- * @param {Object} res - Express response object.
- */
-const createSendToken = (user, statusCode, req, res) => {
-  const token = signToken(user.id);
-
-  const cookieExpiresInMs =
-    process.env.NODE_ENV === "production"
-      ? 4 * 60 * 60 * 1000 + 30 * 60 * 1000
-      : 90 * 24 * 60 * 60 * 1000;
-
-  res.cookie("jwt", token, {
-    expires: new Date(Date.now() + cookieExpiresInMs),
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-  });
-
-  user.passwordHash = undefined;
-
-  return res.status(statusCode).json({
-    status: "success",
-    token,
-    data: {
-      user,
-    },
-  });
-};
 
 //////////////////////// ROUTE PROTECTIONS LOGIC ////////////////////////
 
@@ -131,6 +85,7 @@ exports.protect = (User) =>
 
     const decoded = await promisify(jwt.verify)(
       token,
+      /* istanbul ignore next */
       process.env.NODE_ENV === "production"
         ? process.env.PROD_JWT_SECRET
         : process.env.DEV_JWT_SECRET
@@ -180,13 +135,6 @@ exports.restrictTo = (...roles) => {
 
 //////////////////////// USER MANAGEMENT LOGIC ////////////////////////
 
-const normalizeIpAddress = (ip) => {
-  if (ip && ip.startsWith("::ffff:")) {
-    return ip.substring(7); // Remove '::ffff:'
-  }
-  return ip;
-};
-
 /**
  * @function signup
  * @description Handles user registration, creating a base User and a role-specific profile.
@@ -196,6 +144,8 @@ const normalizeIpAddress = (ip) => {
 exports.signup = catchAsync(async (req, res, next) => {
   const {
     email,
+    firstName,
+    lastName,
     password,
     passwordConfirm,
     role,
@@ -206,10 +156,17 @@ exports.signup = catchAsync(async (req, res, next) => {
     stylesOffered,
   } = req.body;
 
-  if (!email || !password || !passwordConfirm || !role) {
+  if (
+    !email ||
+    !password ||
+    !passwordConfirm ||
+    !role ||
+    !firstName ||
+    !lastName
+  ) {
     return next(
       new AppError(
-        "Please provide email, password, password confirmation, and role.",
+        "Please provide first name, last name, email, password, password confirmation, and role.",
         400
       )
     );
@@ -233,7 +190,7 @@ exports.signup = catchAsync(async (req, res, next) => {
   }
 
   if (!displayName) {
-    return next(new AppError("Please provide a display name"), 400);
+    return next(new AppError("Please provide a display name", 400));
   }
 
   if (role === "artist" && (!city || !state || !zipcode)) {
@@ -246,10 +203,11 @@ exports.signup = catchAsync(async (req, res, next) => {
   }
 
   const t = await db.transaction();
-
   try {
-    const newUser = await Users.create(
+    let newUser = await Users.create(
       {
+        firstName: firstName,
+        lastName: lastName,
         email: email.toLowerCase(),
         passwordHash: password,
         displayName: displayName,
@@ -260,7 +218,7 @@ exports.signup = catchAsync(async (req, res, next) => {
       { transaction: t }
     );
 
-    await EmailPreference.create({ userId: newUser.id }, { transaction: t });
+    await EmailPreferences.create({ userId: newUser.id }, { transaction: t });
 
     const ipAddress = normalizeIpAddress(req.ip);
 
@@ -275,7 +233,7 @@ exports.signup = catchAsync(async (req, res, next) => {
     );
 
     if (role === "artist") {
-      await ArtistDetails.create(
+      const artistDetails = await ArtistDetails.create(
         {
           userId: newUser.id,
           city,
@@ -285,6 +243,25 @@ exports.signup = catchAsync(async (req, res, next) => {
         },
         { transaction: t }
       );
+    }
+    /* istanbul ignore next */
+    if (process.env.NODE_ENV !== "test") {
+      /* istanbul ignore next */
+      try {
+        /* istanbul ignore next */
+        const welcome = new Welcome({
+          recipient: newUser.email,
+          firstName: newUser.firstName,
+        });
+        /* istanbul ignore next */
+        await welcome.sendWelcome();
+      } catch (emailError) {
+        /* istanbul ignore next */
+        console.error("Failed to send welcome email:", emailError);
+      }
+    } else {
+      /* istanbul ignore next */
+      console.log("Skipping password updated email in test environment.");
     }
 
     await t.commit();
@@ -330,15 +307,21 @@ exports.login = catchAsync(async (req, res, next) => {
 
   const lowerCaseEmail = email.toLowerCase();
 
-  if (!lowerCaseEmail || !password)
-    return next(new AppError("Please provide both email and password.", 400));
-
   const user = await Users.findOne({
     where: { email: lowerCaseEmail },
   });
 
-  if (!user || !(await user.correctPassword(password, user.passwordHash))) {
+  if (!user || !(await user.correctPassword(password))) {
     return next(new AppError("Incorrect email or password", 401));
+  }
+
+  if (!user.isActive) {
+    return next(
+      new AppError(
+        "Your account is deactivated, please request to reactivate your account.",
+        403
+      )
+    );
   }
 
   createSendToken(user, 200, req, res);
@@ -350,31 +333,31 @@ exports.login = catchAsync(async (req, res, next) => {
  * Does not block access, but makes user info available if logged in.
  * @returns {Function} An Express middleware function.
  */
-exports.isLoggedIn = catchAsync(async (req, res, next) => {
-  // Removed User param, use Users model directly
-  if (req.cookies.jwt) {
-    try {
-      const decoded = await promisify(jwt.verify)(
-        req.cookies.jwt,
-        process.env.NODE_ENV === "production"
-          ? process.env.PROD_JWT_SECRET
-          : process.env.DEV_JWT_SECRET
-      );
+// exports.isLoggedIn = catchAsync(async (req, res, next) => {
+//   // Removed User param, use Users model directly
+//   if (req.cookies.jwt) {
+//     try {
+//       const decoded = await promisify(jwt.verify)(
+//         req.cookies.jwt,
+//         process.env.NODE_ENV === "production"
+//           ? process.env.PROD_JWT_SECRET
+//           : process.env.DEV_JWT_SECRET
+//       );
 
-      const currentUser = await Users.findByPk(decoded.id);
-      if (!currentUser) return next();
+//       const currentUser = await Users.findByPk(decoded.id);
+//       if (!currentUser) return next();
 
-      if (currentUser.changedPasswordAfter(decoded.iat)) return next();
+//       if (currentUser.changedPasswordAfter(decoded.iat)) return next();
 
-      req.user = currentUser;
-      res.locals.user = currentUser;
-      return next();
-    } catch (error) {
-      return next();
-    }
-  }
-  next();
-});
+//       req.user = currentUser;
+//       res.locals.user = currentUser;
+//       return next();
+//     } catch (error) {
+//       return next();
+//     }
+//   }
+//   next();
+// });
 
 //////////////////////// PASSWORD LOGIC ////////////////////////
 
@@ -389,19 +372,33 @@ exports.forgotPassword = catchAsync(async (req, res, next) => {
   });
   if (!user)
     return next(new AppError("There is no user with that email address.", 404));
-
-  const resetToken = await user.createPasswordResetToken();
-  await user.save({ validate: false });
-
   try {
-    // REMINDER: add password email logic once email classes are set up
+    const resetToken = await user.createPasswordResetToken();
+    await user.save({ validate: false });
+
+    /* istanbul ignore next */
+    if (process.env.NODE_ENV !== "test") {
+      /* istanbul ignore next */
+      const resetUrl = `localhost:3000/reset-password/${resetToken}`;
+      /* istanbul ignore next */
+      const passwordReset = new PasswordReset({
+        recipient: user.email,
+        resetUrl: resetUrl,
+      });
+      /* istanbul ignore next */
+      await passwordReset.sendPasswordReset();
+    } else {
+      /* istanbul ignore next */
+      console.log("Skipping password updated email in test environment.");
+    }
     res.status(200).json({
       status: "success",
       message: "Password reset token sent to email!",
     });
   } catch (error) {
-    user.passwordResetToken = undefined;
-    user.passwordResetExpires = undefined;
+    user.passwordResetToken = null;
+    user.passwordResetExpires = null;
+
     await user.save({ validate: false });
 
     return next(
@@ -419,24 +416,41 @@ exports.forgotPassword = catchAsync(async (req, res, next) => {
  * @returns {Function} An Express middleware function.
  */
 exports.requestPasswordChange = catchAsync(async (req, res, next) => {
-  if (!req.user) {
-    return next(new AppError("User not found in request. Please log in.", 401));
-  }
-
-  const user = await Users.findByPk(req.user.id);
-  if (!user)
-    return next(new AppError("Couldn't find the logged in user.", 404));
-
-  const resetToken = await user.createPasswordResetToken();
-  await user.save({ validate: false });
-
+  let user;
   try {
-    // REMINDER: add password email logic once email classes are set up
+    if (!req.user) {
+      return next(
+        new AppError("User not found in request. Please log in.", 401)
+      );
+    }
+
+    user = await Users.findByPk(req.user.id);
+    if (!user)
+      return next(new AppError("Couldn't find the logged in user.", 404));
+
+    const resetToken = await user.createPasswordResetToken();
+    await user.save({ validate: false });
+    /* istanbul ignore next */
+    if (process.env.NODE_ENV !== "test") {
+      /* istanbul ignore next */
+      const resetUrl = `localhost:3000/reset-password/${resetToken}`;
+      /* istanbul ignore next */
+      const passwordChange = new PasswordChange({
+        recipient: user.email,
+        resetUrl: resetUrl,
+      });
+      /* istanbul ignore next */
+      await passwordChange.sendPasswordChange();
+    } else {
+      /* istanbul ignore next */
+      console.log("Skipping password updated email in test environment.");
+    }
     res.status(200).json({
       status: "success",
       message: "Password change request token sent to your email!",
     });
   } catch (error) {
+    console.error("Error caught:", error);
     user.passwordResetToken = undefined;
     user.passwordResetExpires = undefined;
     await user.save({ validate: false });
@@ -456,35 +470,49 @@ exports.requestPasswordChange = catchAsync(async (req, res, next) => {
  * @returns {Function} An Express middleware function.
  */
 exports.resetPassword = catchAsync(async (req, res, next) => {
-  const hashedToken = crypto
-    .createHash("sha256")
-    .update(req.query.token)
-    .digest("hex");
+  try {
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(req.query.token)
+      .digest("hex");
 
-  console.log("BEFORE USER FIND ONE");
-  const user = await Users.findOne({
-    where: {
-      passwordResetToken: hashedToken,
-      passwordResetExpires: {
-        [Sequelize.Op.gt]: Date.now(),
+    const user = await Users.findOne({
+      where: {
+        passwordResetToken: hashedToken,
+        passwordResetExpires: {
+          [Sequelize.Op.gt]: Date.now(),
+        },
       },
-    },
-  });
-  console.log("AFTER USER FIND ONE");
-  console.log(`USER: ${user}`);
+    });
 
-  if (!user) {
-    return next(new AppError("Token is invalid or has expired", 400));
+    if (!user) {
+      return next(new AppError("Token is invalid or has expired", 400));
+    }
+
+    user.passwordHash = req.body.password;
+    user.passwordResetToken = null;
+    user.passwordResetExpires = null;
+    await user.save();
+    /* istanbul ignore next */
+    if (process.env.NODE_ENV !== "test") {
+      /* istanbul ignore next */
+      const passwordUpdated = new PasswordUpdated({
+        recipient: user.email,
+        firstName: user.firstName,
+      });
+      /* istanbul ignore next */
+      await passwordUpdated.sendPasswordUpdated();
+    } else {
+      /* istanbul ignore next */
+      console.log("Skipping password updated email in test environment.");
+    }
+
+    createSendToken(user, 200, req, res);
+  } catch (error) {
+    return next(
+      new AppError("There was an error while reseting your password", 500)
+    );
   }
-
-  // REMINDER: Should add email logic to send an email on successful password change, so if it wasnt intentional they can take action
-
-  user.passwordHash = req.body.password;
-  user.passwordResetToken = undefined;
-  user.passwordResetExpires = undefined;
-  await user.save();
-
-  createSendToken(user, 200, req, res);
 });
 
 /**
@@ -493,21 +521,328 @@ exports.resetPassword = catchAsync(async (req, res, next) => {
  * @returns {Function} An Express middleware function.
  */
 exports.updatePassword = catchAsync(async (req, res, next) => {
-  if (!req.user) {
-    return next(new AppError("User not found in request. Please log in.", 401));
+  try {
+    if (!req.user) {
+      return next(
+        new AppError("User not found in request. Please log in.", 401)
+      );
+    }
+
+    if (!req.body.password) {
+      return next(new AppError("New password cannot be null.", 400));
+    }
+
+    const user = await Users.findByPk(req.user.id);
+
+    const isCorrect = await user.correctPassword(req.body.passwordCurrent);
+    if (!isCorrect) {
+      return next(new AppError("Your current password is wrong.", 401));
+    }
+
+    user.passwordHash = req.body.password;
+    await user.save();
+    /* istanbul ignore next */
+    if (process.env.NODE_ENV !== "test") {
+      try {
+        /* istanbul ignore next */
+        const passwordUpdated = new PasswordUpdated({
+          recipient: user.email,
+          firstName: user.firstName,
+        });
+        /* istanbul ignore next */
+        await passwordUpdated.sendPasswordUpdated();
+        console.log(`Password updated email sent to ${user.email}`);
+      } catch (emailError) {
+        /* istanbul ignore next */
+        console.error("Failed to send password updated email:", emailError);
+      }
+    } else {
+      /* istanbul ignore next */
+      console.log("Skipping password updated email in test environment.");
+    }
+
+    createSendToken(user, 200, req, res);
+  } catch (error) {
+    return next(
+      new AppError("There was an error while updating your password", 500)
+    );
   }
-  const user = await Users.findByPk(req.user.id);
+});
 
-  const isCorrect = await user.correctPassword(
-    req.body.passwordCurrent,
-    user.passwordHash
-  );
-  if (!isCorrect)
-    return next(new AppError("Your current password is wrong.", 401));
+/**
+ * @function requestEmailChange
+ * @description Allows a logged-in user to request to update their email.
+ * @returns {Function} An Express middleware function.
+ */
+exports.requestEmailChange = catchAsync(async (req, res, next) => {
+  let user;
+  try {
+    if (!req.user) {
+      return next(
+        new AppError("User not found in request. Please log in.", 401)
+      );
+    }
 
-  // REMINDER: should add email logic to notify that password has changed
+    user = await Users.findByPk(req.user.id);
+    if (!user) {
+      return next(new AppError("Couldn't find the logged in user.", 404));
+    }
 
-  user.passwordHash = req.body.password;
-  await user.save();
-  createSendToken(user, 200, req, res);
+    const resetToken = await user.createEmailChangeToken();
+    await user.save({ validate: false });
+    /* istanbul ignore next */
+    if (process.env.NODE_ENV !== "test") {
+      /* istanbul ignore next */
+      const secureChangeUrl = `${
+        process.env.FRONTEND_URL || "http://localhost:3000"
+      }/update-email/${encodeURIComponent(resetToken)}`;
+      /* istanbul ignore next */
+      const emailChange = new EmailChange({
+        recipient: user.email,
+        secureChangeUrl,
+      });
+      /* istanbul ignore next */
+      await emailChange.sendEmailChange();
+    } else {
+      /* istanbul ignore next */
+      console.log("Skipping password updated email in test environment.");
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: "Email update request token sent to your email!",
+    });
+  } catch (error) {
+    user.emailChangeToken = undefined;
+    user.emailChangeExpires = undefined;
+    await user.save({ validate: false });
+
+    return next(
+      new AppError(
+        "There was an error while requesting an email update. Please try again later.",
+        500
+      )
+    );
+  }
+});
+
+/**
+ * @function updateEmail
+ * @description Takes in the users new email and updates it in the database.
+ * @returns {Function} An Express middleware function.
+ */
+exports.updateEmail = catchAsync(async (req, res, next) => {
+  try {
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(req.query.token)
+      .digest("hex");
+    const user = await Users.findOne({
+      where: {
+        emailChangeToken: hashedToken,
+        emailChangeExpires: {
+          [Sequelize.Op.gt]: Date.now(),
+        },
+      },
+    });
+    if (!user) {
+      return next(new AppError("Token is invalid or has expired", 400));
+    }
+    user.email = req.body.newEmail;
+    user.emailChangeToken = null;
+    user.emailChangeExpires = null;
+    await user.save();
+    /* istanbul ignore next */
+    if (process.env.NODE_ENV !== "test") {
+      /* istanbul ignore next */
+      await new EmailUpdated({
+        recipient: oldEmail,
+        firstName: user.firstName,
+        newEmail,
+      }).sendEmailUpdated();
+      /* istanbul ignore next */
+      await new EmailUpdated({
+        recipient: newEmail,
+        firstName: user.firstName,
+        newEmail,
+      }).sendEmailUpdated();
+    } else {
+      /* istanbul ignore next */
+      console.log("Skipping password updated email in test environment.");
+    }
+    createSendToken(user, 200, req, res);
+  } catch (error) {
+    return next(
+      new AppError("There was an error while updating your email", 500)
+    );
+  }
+});
+
+/**
+ * @function deactivateProfile
+ * @description Does a soft delete flipping the isActive value.
+ * @returns {Function} An Express middleware function.
+ */
+exports.deactivateProfile = catchAsync(async (req, res, next) => {
+  try {
+    if (!req.user) {
+      return next(
+        new AppError("User not found in request. Please log in.", 401)
+      );
+    }
+
+    const user = await Users.findByPk(req.user.id);
+    if (!user) {
+      return next(new AppError("Couldn't find the logged in user.", 404));
+    }
+
+    user.isActive = false;
+    await user.save({ validate: false });
+
+    res.cookie("jwt", "loggedout", {
+      expires: new Date(Date.now() + 10 * 1000),
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+    });
+
+    res
+      .status(200)
+      .json({ status: "success", message: "Logged out successfully." });
+  } catch (error) {
+    return next(
+      new AppError(
+        "There was an error while deactivating your account. Please try again later.",
+        500
+      )
+    );
+  }
+});
+
+/**
+ * @function requestAccountReactivation
+ * @description Sends an email with a secure link to reactivate a users account.
+ * @returns {Function} An Express middleware function.
+ */
+exports.requestAccountReactivation = catchAsync(async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email) return next(new AppError("Please provide your email.", 400));
+
+    const user = await Users.findOne({ where: { email: email.toLowerCase() } });
+    if (!user)
+      return next(new AppError("No account found with that email.", 404));
+
+    if (user.isActive) {
+      return next(new AppError("Account is already active.", 400));
+    }
+
+    const token = user.createReactivateAccountToken();
+    await user.save({ validate: false });
+    /* istanbul ignore next */
+    if (process.env.NODE_ENV !== "test") {
+      /* istanbul ignore next */
+      const reactivationUrl = `${process.env.FRONTEND_URL}/reactivate-account/${token}`;
+      /* istanbul ignore next */
+      await new ReactivateAccountEmail({
+        recipient: user.email,
+        firstName: user.firstName,
+        reactivationUrl,
+      }).send();
+    } else {
+      /* istanbul ignore next */
+      console.log("Skipping password updated email in test environment.");
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: "Reactivation link sent to your email.",
+    });
+  } catch (error) {
+    return next(
+      new AppError(
+        "There was an error while requesting to reactivate your account. Please try again later.",
+        500
+      )
+    );
+  }
+});
+
+/**
+ * @function reactivateProfile
+ * @description Re-enables a deactivated profile.
+ * @returns {Function} An Express middleware function.
+ */
+exports.reactivateProfile = catchAsync(async (req, res, next) => {
+  try {
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(req.query.token)
+      .digest("hex");
+
+    const user = await Users.findOne({
+      where: {
+        reactivateAccountToken: hashedToken,
+        reactivateAccountExpires: {
+          [Sequelize.Op.gt]: Date.now(),
+        },
+      },
+    });
+
+    if (!user) {
+      return next(new AppError("Token is invalid or has expired", 400));
+    }
+
+    user.isActive = true;
+    user.reactivateAccountToken = null;
+    user.reactivateAccountExpires = null;
+    await user.save();
+
+    createSendToken(user, 200, req, res);
+  } catch (error) {
+    return next(
+      new AppError(
+        "There was an error while reactivating your account. Please try again later.",
+        500
+      )
+    );
+  }
+});
+
+/**
+ * @function deleteProfile
+ * @description Permanent hard delete on the signed in user.
+ * @returns {Function} An Express middleware function.
+ */
+exports.deleteProfile = catchAsync(async (req, res, next) => {
+  try {
+    if (!req.user) {
+      return next(
+        new AppError("User not found in request. Please log in.", 401)
+      );
+    }
+
+    const user = await Users.findByPk(req.user.id);
+    if (!user) {
+      return next(new AppError("Couldn't find the logged in user.", 404));
+    }
+
+    await user.destroy();
+
+    res.cookie("jwt", "deleted", {
+      expires: new Date(Date.now() + 10 * 1000),
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+    });
+
+    res
+      .status(200)
+      .json({ status: "success", message: "Deleted profile successfully." });
+  } catch (error) {
+    return next(
+      new AppError(
+        "There was an error while deleting your account. Please try again later.",
+        500
+      )
+    );
+  }
 });

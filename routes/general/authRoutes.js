@@ -19,8 +19,14 @@ authRouter.get("/logout", (req, res) => {
     .status(200)
     .json({ status: "success", message: "Logged out successfully." });
 });
+authRouter.patch("/requestReactivation", authController.requestAccountReactivation)
+authRouter.patch("/reactivateProfile", authController.reactivateProfile)
 authRouter.use(authController.protect(Users));
 authRouter.post("/requestPasswordChange", authController.requestPasswordChange);
 authRouter.patch("/updatePassword", authController.updatePassword);
+authRouter.post("/requestEmailChange", authController.requestEmailChange)
+authRouter.patch("/updateEmail", authController.updateEmail)
+authRouter.patch("/deactivateProfile", authController.deactivateProfile)
+authRouter.delete("/deleteProfile", authController.deleteProfile)
 
 module.exports = authRouter;

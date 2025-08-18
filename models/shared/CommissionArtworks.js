@@ -70,7 +70,7 @@ const CommissionArtworks = db.define(
     },
     totalFavorites: {
       type: DataTypes.INTEGER,
-      defaultValue: true,
+      defaultValue: 0,
       validate: {
         min: 0,
         isInt: true,

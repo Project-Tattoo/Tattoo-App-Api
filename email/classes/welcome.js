@@ -1,4 +1,4 @@
-const Email = require("./../utils/email");
+const Email = require("./email");
 
 module.exports = class Welcome extends Email {
   constructor({ recipient, firstName }) {
