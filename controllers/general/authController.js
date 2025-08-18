@@ -239,7 +239,6 @@ exports.signup = catchAsync(async (req, res, next) => {
           city,
           state,
           zipcode,
-          /* istanbul ignore next */
           stylesOffered: stylesOffered || [],
         },
         { transaction: t }
