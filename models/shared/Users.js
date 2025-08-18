@@ -222,10 +222,9 @@ const Users = db.define(
 );
 
 Users.prototype.correctPassword = async function (
-  candidatePassword,
-  storedPassword
+  candidatePassword
 ) {
-  return await bcrypt.compare(candidatePassword, storedPassword);
+  return await bcrypt.compare(candidatePassword, this.passwordHash);
 };
 
 Users.prototype.changedPasswordAfter = function (JWTTimestamp) {

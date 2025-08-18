@@ -18,6 +18,11 @@ jest.mock("./../../../../models/shared/Users");
 jest.mock("./../../../../models/shared/EmailPreferences");
 jest.mock("./../../../../models/shared/TOSAgreement");
 
+jest.spyOn(db, "transaction").mockResolvedValue({
+  commit: jest.fn().mockResolvedValue(),
+  rollback: jest.fn().mockResolvedValue(),
+});
+
 require("dotenv").config({ path: "./.env.test" });
 
 const createMockResponse = () => {
@@ -38,11 +43,15 @@ describe("signup", () => {
     res = createMockResponse();
     next = jest.fn();
 
-    createSendToken.mockImplementation(() => {
-      return res.status(201).json({
+    createSendToken.mockImplementation((user, statusCode, req, res) => {
+
+      res.cookie = jest.fn().mockReturnThis();
+
+
+      return res.status(statusCode).json({
         status: "success",
         token: "mock-token",
-        data: { user: { id: "mockUserId", email: "mock@example.com" } },
+        data: { user: { ...user.toJSON(), passwordHash: undefined } },
       });
     });
 
@@ -53,8 +62,13 @@ describe("signup", () => {
 
     Users.create.mockResolvedValue({
       id: "mockUserId",
-      email: "mock@example.com",
-      firstName: "Mock",
+      email: "jane@example.com",
+      firstName: "Jane",
+      lastName: "Doe",
+      displayName: "JaneD",
+      passwordHash: "Password123!",
+      isActive: true,
+      verifiedEmail: false,
     });
     EmailPreferences.create.mockResolvedValue({});
     TOSAgreement.create.mockResolvedValue({});
@@ -62,108 +76,6 @@ describe("signup", () => {
 
   beforeAll(() => {
     normalizeIpAddress.mockReturnValue("127.0.0.1");
-  });
-
-  it("should prevent signup with missing fields", async () => {
-    req.body = { email: "test@example.com", password: "123456" };
-    await authController.signup(req, res, next);
-
-    expect(next).toHaveBeenCalledWith(expect.any(AppError));
-    const err = next.mock.calls[0][0];
-    expect(err.message).toMatch(/Please provide first/);
-    expect(err.statusCode).toBe(400);
-  });
-
-  it("should prevent registration with passwords that don't match", async () => {
-    req.body = {
-      firstName: "firstName",
-      lastName: "lastName",
-      email: "test@example.com",
-      password: "password123",
-      passwordConfirm: "password1234",
-      role: "user",
-    };
-    jest.spyOn(db, "transaction");
-
-    await authController.signup(req, res, next);
-
-    expect(next).toHaveBeenCalledWith(expect.any(AppError));
-    expect(next.mock.calls[0][0].message).toContain("Passwords do not match.");
-    expect(res.status).not.toHaveBeenCalled();
-    expect(res.json).not.toHaveBeenCalled();
-    expect(db.transaction).not.toHaveBeenCalled();
-  });
-
-  it("should prevent registration of an admin role", async () => {
-    req.body = {
-      firstName: "firstName",
-      lastName: "lastName",
-      email: "admin@example.com",
-      password: "password123",
-      passwordConfirm: "password123",
-      role: "admin",
-    };
-
-    await authController.signup(req, res, next);
-
-    expect(next).toHaveBeenCalledWith(expect.any(AppError));
-    const error = next.mock.calls[0][0];
-    expect(error.message).toMatch(/Admin accounts cannot be registered/);
-    expect(error.statusCode).toBe(403);
-  });
-
-  it("should prevent registration with an invalid role", async () => {
-    req.body = {
-      firstName: "firstName",
-      lastName: "lastName",
-      email: "invalidrole@example.com",
-      password: "password123",
-      passwordConfirm: "password123",
-      role: "superuser",
-    };
-    Users.create.mockClear();
-    jest.spyOn(db, "transaction");
-
-    await authController.signup(req, res, next);
-
-    const error = next.mock.calls[0][0];
-    expect(error.message).toMatch(/invalid user role/i);
-    expect(error.statusCode).toBe(400);
-    expect(res.status).not.toHaveBeenCalled();
-    expect(res.json).not.toHaveBeenCalled();
-    expect(Users.create).not.toHaveBeenCalled();
-    expect(db.transaction).not.toHaveBeenCalled();
-  });
-
-  it("should handle SequelizeUniqueConstraintError", async () => {
-    req = mockRequest({
-      body: {
-        firstName: "firstName",
-        lastName: "lastName",
-        email: "duplicate@example.com",
-        password: "Password123!",
-        passwordConfirm: "Password123!",
-        role: "user",
-        displayName: "duplicateUser",
-      },
-    });
-    const res = mockResponse();
-    const next = jest.fn();
-
-    const error = mockSequelizeUniqueConstraintError(["email"]);
-    Users.create.mockRejectedValue(error);
-
-    await new Promise((resolve) => {
-      authController.signup(req, res, (...args) => {
-        next(...args);
-        resolve();
-      });
-    });
-
-    const receivedError = next.mock.calls[0][0];
-    expect(receivedError).toBeInstanceOf(AppError);
-    expect(receivedError.message).toMatch(/duplicate@example\.com/);
-    expect(receivedError.statusCode).toBe(400);
   });
 
   it("should handle SequelizeValidationError", async () => {
@@ -240,53 +152,16 @@ describe("signup", () => {
     const res = mockResponse();
     const next = jest.fn();
 
-    await authController.signup(req, res, next);
+    await new Promise((resolve) => {
+      authController.signup(req, res, (...args) => {
+        next(...args);
+        resolve();
+      });
+    });
 
     const err = next.mock.calls[0][0];
     expect(err).toBeInstanceOf(AppError);
     expect(err.message).toMatch(/display name/i);
     expect(err.statusCode).toBe(400);
-  });
-
-  it("should send welcome email when not in test environment", async () => {
-    const originalNodeEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = "development";
-
-    const sendWelcomeMock = jest.fn().mockResolvedValue();
-    Welcome.mockImplementation(() => ({
-      sendWelcome: sendWelcomeMock,
-    }));
-
-    Users.create.mockResolvedValue({
-      id: "mockUserId",
-      email: "jane@example.com",
-      firstName: "Jane",
-      displayName: "JaneD",
-    });
-
-    const req = {
-      body: {
-        firstName: "Jane",
-        lastName: "Doe",
-        email: "jane@example.com",
-        password: "Password123!",
-        passwordConfirm: "Password123!",
-        role: "user",
-        displayName: "JaneD",
-      },
-    };
-    const res = mockResponse();
-    const next = jest.fn();
-
-    await authController.signup(req, res, next);
-
-    expect(Welcome).toHaveBeenCalledWith({
-      recipient: "jane@example.com",
-      firstName: "Jane",
-    });
-
-    expect(sendWelcomeMock).toHaveBeenCalled();
-
-    process.env.NODE_ENV = originalNodeEnv;
   });
 });

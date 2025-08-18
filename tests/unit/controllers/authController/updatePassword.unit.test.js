@@ -51,8 +51,7 @@ describe("updatePassword", () => {
 
     expect(Users.findByPk).toHaveBeenCalledWith(1);
     expect(mockUser.correctPassword).toHaveBeenCalledWith(
-      "wrongpassword",
-      undefined
+      "wrongpassword"
     );
     expect(next).toHaveBeenCalledWith(expect.any(AppError));
     const err = next.mock.calls[0][0];

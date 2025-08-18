@@ -5,8 +5,10 @@ const AppError = require("../../../../utils/appError");
 const Users = require("../../../../models/shared/Users");
 const { mockResponse } = require("../../../utils/mockExpress");
 
+jest.mock("../../../../models/shared/Users");
+
 describe("resetPassword", () => {
-  let res, next;
+  let req, res, next;
 
   beforeEach(() => {
     res = mockResponse();
@@ -17,7 +19,7 @@ describe("resetPassword", () => {
     jest.restoreAllMocks();
   });
 
-  it("should call next AppError when passwordResetToken is invalid or expired", async () => {
+  it("should call next with AppError when passwordResetToken is invalid or expired", async () => {
     const rawToken = "invalidtoken";
     const hashedToken = crypto
       .createHash("sha256")
@@ -46,28 +48,40 @@ describe("resetPassword", () => {
     expect(next).toHaveBeenCalledWith(expect.any(AppError));
     const error = next.mock.calls[0][0];
     expect(error.message).toMatch(/token is invalid or has expired/i);
+    expect(error.statusCode).toBe(400);
   });
 
-  it("should error when req.body.password is missing", async () => {
-    const mockUser = {
-      passwordResetToken: "sometoken",
-      passwordResetExpires: Date.now() + 10000,
-      save: jest.fn(),
-    };
-
-    const req = { params: { token: "resettoken" }, body: {} };
-
+  it("should call next with an AppError on a general error", async () => {
+    const rawToken = "validtoken123";
     const hashedToken = crypto
       .createHash("sha256")
-      .update("resettoken")
+      .update(rawToken)
       .digest("hex");
 
+    const mockUser = {
+      passwordResetToken: hashedToken,
+      passwordResetExpires: Date.now() + 10000,
+      save: jest.fn().mockRejectedValue(new Error("Database error")),
+    };
+
+    const req = {
+      query: { token: rawToken },
+      body: { password: "newPassword123" },
+    };
     jest.spyOn(Users, "findOne").mockResolvedValue(mockUser);
 
-    await authController.resetPassword(req, res, next);
+    await new Promise((resolve) => {
+      authController.resetPassword(req, res, (...args) => {
+        next(...args);
+        resolve();
+      });
+    });
 
-    expect(next).toHaveBeenCalled();
-    const err = next.mock.calls[0][0];
-    expect(err).toBeInstanceOf(Error);
+    expect(next).toHaveBeenCalledWith(expect.any(AppError));
+    const errorArg = next.mock.calls[0][0];
+    expect(errorArg.statusCode).toBe(500);
+    expect(errorArg.message).toBe(
+      "There was an error while reseting your password"
+    );
   });
 });

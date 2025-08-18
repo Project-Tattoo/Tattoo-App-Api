@@ -2,6 +2,8 @@ const authController = require("./../../../../controllers/general/authController
 const Users = require("./../../../../models/shared/Users");
 const AppError = require("../../../../utils/appError");
 const { mockRequest, mockResponse } = require("../../../utils/mockExpress");
+const createSendToken = require("./../../../../utils/createSendToken");
+jest.mock("./../../../../utils/createSendToken");
 
 describe("login", () => {
   let req, res, next;
@@ -95,5 +97,37 @@ describe("login", () => {
     expect(err).toBeInstanceOf(AppError);
     expect(err.message).toMatch(/incorrect email or password/i);
     expect(err.statusCode).toBe(401);
+  });
+
+  it("should prevent login for inactive accounts", async () => {
+    const mockUser = {
+      id: 1,
+      email: "inactive@example.com",
+      isActive: false,
+      passwordHash: "hashedpassword",
+      correctPassword: jest.fn().mockResolvedValue(true),
+    };
+
+    req = mockRequest({
+      body: {
+        email: "inactive@example.com",
+        password: "correctpassword",
+      },
+    });
+
+    Users.findOne = jest.fn().mockResolvedValue(mockUser);
+
+    await new Promise((resolve) => {
+      authController.login(req, res, (...args) => {
+        next(...args);
+        resolve();
+      });
+    });
+
+    const err = next.mock.calls[0][0]
+    expect(next).toHaveBeenCalled()
+    expect(err).toBeInstanceOf(AppError)
+    expect(err.message).toMatch(/account is deactivated/i)
+    expect(err.statusCode).toBe(403)
   });
 });

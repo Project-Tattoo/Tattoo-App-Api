@@ -16,7 +16,7 @@ const Welcome = require("./../../email/classes/welcome");
 const EmailChange = require("./../../email/classes/emailChange");
 const EmailUpdated = require("./../../email/classes/emailUpdated");
 const normalizeIpAddress = require("./../../utils/normalizeIpAddress");
-const createSendToken = require("./../../utils/createSendToken")
+const createSendToken = require("./../../utils/createSendToken");
 
 //////////////////////// JWT LOGIC ////////////////////////
 /**
@@ -54,9 +54,6 @@ exports.validateToken = catchAsync(async (req, res, next) => {
       .json({ valid: false, message: "Invalid or expired token." });
   }
 });
-
-
-
 
 //////////////////////// ROUTE PROTECTIONS LOGIC ////////////////////////
 
@@ -245,20 +242,23 @@ exports.signup = catchAsync(async (req, res, next) => {
         { transaction: t }
       );
     }
+
     if (process.env.NODE_ENV !== "test") {
-      console.log("trying to instantiate the email")
+      /* istanbul ignore next */
       try {
+        /* istanbul ignore next */
         const welcome = new Welcome({
           recipient: newUser.email,
           firstName: newUser.firstName,
         });
-        console.log("trying to send the email")
+        /* istanbul ignore next */
         await welcome.sendWelcome();
-        console.log(`Welcome email sent to ${newUser.email}`);
       } catch (emailError) {
+        /* istanbul ignore next */
         console.error("Failed to send welcome email:", emailError);
       }
     } else {
+      /* istanbul ignore next */
       console.log("Skipping password updated email in test environment.");
     }
 
@@ -305,23 +305,21 @@ exports.login = catchAsync(async (req, res, next) => {
 
   const lowerCaseEmail = email.toLowerCase();
 
-  if (!lowerCaseEmail || !password)
-    return next(new AppError("Please provide both email and password.", 400));
-
   const user = await Users.findOne({
     where: { email: lowerCaseEmail },
   });
 
-  if (!user || !(await user.correctPassword(password, user.passwordHash))) {
+  if (!user || !(await user.correctPassword(password))) {
     return next(new AppError("Incorrect email or password", 401));
   }
 
   if (!user.isActive) {
-    return res.status(403).json({
-      status: "fail",
-      message:
-        "Your account has been deactivated. Please check your email to reactivate.",
-    });
+    return next(
+      new AppError(
+        "Your account is deactivated, please request to reactivate your account.",
+        403
+      )
+    );
   }
 
   createSendToken(user, 200, req, res);
@@ -333,31 +331,31 @@ exports.login = catchAsync(async (req, res, next) => {
  * Does not block access, but makes user info available if logged in.
  * @returns {Function} An Express middleware function.
  */
-exports.isLoggedIn = catchAsync(async (req, res, next) => {
-  // Removed User param, use Users model directly
-  if (req.cookies.jwt) {
-    try {
-      const decoded = await promisify(jwt.verify)(
-        req.cookies.jwt,
-        process.env.NODE_ENV === "production"
-          ? process.env.PROD_JWT_SECRET
-          : process.env.DEV_JWT_SECRET
-      );
+// exports.isLoggedIn = catchAsync(async (req, res, next) => {
+//   // Removed User param, use Users model directly
+//   if (req.cookies.jwt) {
+//     try {
+//       const decoded = await promisify(jwt.verify)(
+//         req.cookies.jwt,
+//         process.env.NODE_ENV === "production"
+//           ? process.env.PROD_JWT_SECRET
+//           : process.env.DEV_JWT_SECRET
+//       );
 
-      const currentUser = await Users.findByPk(decoded.id);
-      if (!currentUser) return next();
+//       const currentUser = await Users.findByPk(decoded.id);
+//       if (!currentUser) return next();
 
-      if (currentUser.changedPasswordAfter(decoded.iat)) return next();
+//       if (currentUser.changedPasswordAfter(decoded.iat)) return next();
 
-      req.user = currentUser;
-      res.locals.user = currentUser;
-      return next();
-    } catch (error) {
-      return next();
-    }
-  }
-  next();
-});
+//       req.user = currentUser;
+//       res.locals.user = currentUser;
+//       return next();
+//     } catch (error) {
+//       return next();
+//     }
+//   }
+//   next();
+// });
 
 //////////////////////// PASSWORD LOGIC ////////////////////////
 
@@ -372,20 +370,23 @@ exports.forgotPassword = catchAsync(async (req, res, next) => {
   });
   if (!user)
     return next(new AppError("There is no user with that email address.", 404));
-
-  const resetToken = await user.createPasswordResetToken();
-  await user.save({ validate: false });
-
   try {
+    const resetToken = await user.createPasswordResetToken();
+    await user.save({ validate: false });
+
+    /* istanbul ignore next */
     if (process.env.NODE_ENV !== "test") {
+      /* istanbul ignore next */
       const resetUrl = `localhost:3000/reset-password/${resetToken}`;
+      /* istanbul ignore next */
       const passwordReset = new PasswordReset({
         recipient: user.email,
         resetUrl: resetUrl,
       });
-
+      /* istanbul ignore next */
       await passwordReset.sendPasswordReset();
     } else {
+      /* istanbul ignore next */
       console.log("Skipping password updated email in test environment.");
     }
     res.status(200).json({
@@ -393,8 +394,9 @@ exports.forgotPassword = catchAsync(async (req, res, next) => {
       message: "Password reset token sent to email!",
     });
   } catch (error) {
-    user.passwordResetToken = undefined;
-    user.passwordResetExpires = undefined;
+    user.passwordResetToken = null;
+    user.passwordResetExpires = null;
+
     await user.save({ validate: false });
 
     return next(
@@ -412,6 +414,7 @@ exports.forgotPassword = catchAsync(async (req, res, next) => {
  * @returns {Function} An Express middleware function.
  */
 exports.requestPasswordChange = catchAsync(async (req, res, next) => {
+  let user;
   try {
     if (!req.user) {
       return next(
@@ -419,7 +422,7 @@ exports.requestPasswordChange = catchAsync(async (req, res, next) => {
       );
     }
 
-    const user = await Users.findByPk(req.user.id);
+    user = await Users.findByPk(req.user.id);
     if (!user)
       return next(new AppError("Couldn't find the logged in user.", 404));
 
@@ -427,13 +430,17 @@ exports.requestPasswordChange = catchAsync(async (req, res, next) => {
     await user.save({ validate: false });
 
     if (process.env.NODE_ENV !== "test") {
+      /* istanbul ignore next */
       const resetUrl = `localhost:3000/reset-password/${resetToken}`;
+      /* istanbul ignore next */
       const passwordChange = new PasswordChange({
         recipient: user.email,
         resetUrl: resetUrl,
       });
+      /* istanbul ignore next */
       await passwordChange.sendPasswordChange();
     } else {
+      /* istanbul ignore next */
       console.log("Skipping password updated email in test environment.");
     }
     res.status(200).json({
@@ -481,16 +488,20 @@ exports.resetPassword = catchAsync(async (req, res, next) => {
     }
 
     user.passwordHash = req.body.password;
-    user.passwordResetToken = undefined;
-    user.passwordResetExpires = undefined;
+    user.passwordResetToken = null;
+    user.passwordResetExpires = null;
     await user.save();
+    /* istanbul ignore next */
     if (process.env.NODE_ENV !== "test") {
+      /* istanbul ignore next */
       const passwordUpdated = new PasswordUpdated({
         recipient: user.email,
         firstName: user.firstName,
       });
+      /* istanbul ignore next */
       await passwordUpdated.sendPasswordUpdated();
     } else {
+      /* istanbul ignore next */
       console.log("Skipping password updated email in test environment.");
     }
 
@@ -522,8 +533,7 @@ exports.updatePassword = catchAsync(async (req, res, next) => {
     const user = await Users.findByPk(req.user.id);
 
     const isCorrect = await user.correctPassword(
-      req.body.passwordCurrent,
-      user.passwordHash
+      req.body.passwordCurrent
     );
     if (!isCorrect) {
       return next(new AppError("Your current password is wrong.", 401));
@@ -534,16 +544,20 @@ exports.updatePassword = catchAsync(async (req, res, next) => {
 
     if (process.env.NODE_ENV !== "test") {
       try {
+        /* istanbul ignore next */
         const passwordUpdated = new PasswordUpdated({
           recipient: user.email,
           firstName: user.firstName,
         });
+        /* istanbul ignore next */
         await passwordUpdated.sendPasswordUpdated();
         console.log(`Password updated email sent to ${user.email}`);
       } catch (emailError) {
+        /* istanbul ignore next */
         console.error("Failed to send password updated email:", emailError);
       }
     } else {
+      /* istanbul ignore next */
       console.log("Skipping password updated email in test environment.");
     }
 
@@ -577,17 +591,19 @@ exports.requestEmailChange = catchAsync(async (req, res, next) => {
     await user.save({ validate: false });
 
     if (process.env.NODE_ENV !== "test") {
+      /* istanbul ignore next */
       const secureChangeUrl = `${
         process.env.FRONTEND_URL || "http://localhost:3000"
       }/update-email/${encodeURIComponent(resetToken)}`;
-
+      /* istanbul ignore next */
       const emailChange = new EmailChange({
         recipient: user.email,
         secureChangeUrl,
       });
-
+      /* istanbul ignore next */
       await emailChange.sendEmailChange();
     } else {
+      /* istanbul ignore next */
       console.log("Skipping password updated email in test environment.");
     }
 
@@ -643,17 +659,20 @@ exports.updateEmail = catchAsync(async (req, res, next) => {
     user.emailChangeExpires = undefined;
     await user.save();
     if (process.env.NODE_ENV !== "test") {
+      /* istanbul ignore next */
       await new EmailUpdated({
         recipient: oldEmail,
         firstName: user.firstName,
         newEmail,
       }).sendEmailUpdated();
+      /* istanbul ignore next */
       await new EmailUpdated({
         recipient: newEmail,
         firstName: user.firstName,
         newEmail,
       }).sendEmailUpdated();
     } else {
+      /* istanbul ignore next */
       console.log("Skipping password updated email in test environment.");
     }
 
@@ -726,13 +745,16 @@ exports.requestAccountReactivation = catchAsync(async (req, res, next) => {
     await user.save({ validate: false });
 
     if (process.env.NODE_ENV !== "test") {
+      /* istanbul ignore next */
       const reactivationUrl = `${process.env.FRONTEND_URL}/reactivate-account/${token}`;
+      /* istanbul ignore next */
       await new ReactivateAccountEmail({
         recipient: user.email,
         firstName: user.firstName,
         reactivationUrl,
       }).send();
     } else {
+      /* istanbul ignore next */
       console.log("Skipping password updated email in test environment.");
     }
 

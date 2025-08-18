@@ -5,6 +5,7 @@ const Users = require("../../../models/shared/Users");
 const EmailPreference = require("../../../models/shared/EmailPreferences");
 const TOSAgreement = require("../../../models/shared/TOSAgreement");
 const ArtistDetails = require("../../../models/artists/ArtistDetails");
+const crypto = require("crypto");
 
 require("dotenv").config({ path: "./.env.test" });
 
@@ -286,6 +287,58 @@ describe("Auth API Integration Tests", () => {
       const cookies = res.headers["set-cookie"];
       expect(cookies).toBeDefined();
       expect(cookies[0]).toMatch(/jwt=loggedout/);
+    });
+  });
+
+  describe("Password Reset", () => {
+    it("should successfully reset password", async () => {
+      // 1. Create test user directly in the test
+      const testUser = await Users.create({
+        firstName: "Test",
+        lastName: "User",
+        email: "reset-test@example.com",
+        passwordHash: "originalPass123",
+        role: "user",
+        displayName: "Reset Test",
+        isActive: true,
+        verifiedEmail: false,
+      });
+
+      // 2. Generate and set the reset token (EXACTLY as your auth controller does)
+      const validToken = "valid-reset-token-123";
+      const hashedToken = crypto
+        .createHash("sha256")
+        .update(validToken)
+        .digest("hex");
+
+      await testUser.update({
+        passwordResetToken: hashedToken,
+        passwordResetExpires: new Date(Date.now() + 3600000), // 1 hour from now
+      });
+
+      // 3. Make the request
+      const res = await request(app)
+        .patch("/api/v1/auth/resetPassword") // or .post()
+        .query({ token: validToken })
+        .send({
+          password: "NewPassword123!",
+          passwordConfirm: "NewPassword123!",
+        });
+
+      // 4. Verify success response
+      expect(res.status).toBe(200);
+      expect(res.body.token).toBeDefined();
+
+      // 5. Verify database updates
+      const updatedUser = await Users.findOne({
+        where: { email: "reset-test@example.com" },
+      });
+      expect(await updatedUser.correctPassword("NewPassword123!")).toBe(true);
+      expect(updatedUser.passwordResetToken).toBeNull();
+      expect(updatedUser.passwordResetExpires).toBeNull();
+
+      // Cleanup
+      await Users.destroy({ where: { email: "reset-test@example.com" } });
     });
   });
 });
