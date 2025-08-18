@@ -50,9 +50,7 @@ describe("updatePassword", () => {
     });
 
     expect(Users.findByPk).toHaveBeenCalledWith(1);
-    expect(mockUser.correctPassword).toHaveBeenCalledWith(
-      "wrongpassword"
-    );
+    expect(mockUser.correctPassword).toHaveBeenCalledWith("wrongpassword");
     expect(next).toHaveBeenCalledWith(expect.any(AppError));
     const err = next.mock.calls[0][0];
     expect(err.message).toMatch(/current password is wrong/i);
@@ -91,6 +89,38 @@ describe("updatePassword", () => {
     expect(next).toHaveBeenCalledWith(expect.any(Error));
     const error = next.mock.calls[0][0];
     expect(error.message).toMatch(/cannot be null/i);
+
+    Users.findByPk.mockRestore();
+  });
+
+  it("should handle errors during password update", async () => {
+    const mockUser = {
+      id: 1,
+      correctPassword: jest.fn().mockResolvedValue(true),
+      save: jest.fn().mockRejectedValue(new Error("Database error")),
+    };
+
+    const req = {
+      user: { id: 1 },
+      body: {
+        passwordCurrent: "oldPass123",
+        password: "newPass123",
+        passwordConfirm: "newPass123",
+      },
+    };
+
+    jest.spyOn(Users, "findByPk").mockResolvedValue(mockUser);
+
+    await new Promise((resolve) => {
+      authController.updatePassword(req, res, (...args) => {
+        next(...args);
+        resolve();
+      });
+    });
+
+    expect(next).toHaveBeenCalledWith(
+      new AppError("There was an error while updating your password", 500)
+    );
 
     Users.findByPk.mockRestore();
   });

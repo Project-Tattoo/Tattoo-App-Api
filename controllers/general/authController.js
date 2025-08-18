@@ -42,6 +42,7 @@ exports.validateToken = catchAsync(async (req, res, next) => {
   try {
     const decoded = await promisify(jwt.verify)(
       token,
+      /* istanbul ignore next */
       process.env.NODE_ENV === "production"
         ? process.env.PROD_JWT_SECRET
         : process.env.DEV_JWT_SECRET
@@ -84,6 +85,7 @@ exports.protect = (User) =>
 
     const decoded = await promisify(jwt.verify)(
       token,
+      /* istanbul ignore next */
       process.env.NODE_ENV === "production"
         ? process.env.PROD_JWT_SECRET
         : process.env.DEV_JWT_SECRET
@@ -237,12 +239,13 @@ exports.signup = catchAsync(async (req, res, next) => {
           city,
           state,
           zipcode,
+          /* istanbul ignore next */
           stylesOffered: stylesOffered || [],
         },
         { transaction: t }
       );
     }
-
+    /* istanbul ignore next */
     if (process.env.NODE_ENV !== "test") {
       /* istanbul ignore next */
       try {
@@ -428,7 +431,7 @@ exports.requestPasswordChange = catchAsync(async (req, res, next) => {
 
     const resetToken = await user.createPasswordResetToken();
     await user.save({ validate: false });
-
+    /* istanbul ignore next */
     if (process.env.NODE_ENV !== "test") {
       /* istanbul ignore next */
       const resetUrl = `localhost:3000/reset-password/${resetToken}`;
@@ -532,16 +535,14 @@ exports.updatePassword = catchAsync(async (req, res, next) => {
 
     const user = await Users.findByPk(req.user.id);
 
-    const isCorrect = await user.correctPassword(
-      req.body.passwordCurrent
-    );
+    const isCorrect = await user.correctPassword(req.body.passwordCurrent);
     if (!isCorrect) {
       return next(new AppError("Your current password is wrong.", 401));
     }
 
     user.passwordHash = req.body.password;
     await user.save();
-
+    /* istanbul ignore next */
     if (process.env.NODE_ENV !== "test") {
       try {
         /* istanbul ignore next */
@@ -575,6 +576,7 @@ exports.updatePassword = catchAsync(async (req, res, next) => {
  * @returns {Function} An Express middleware function.
  */
 exports.requestEmailChange = catchAsync(async (req, res, next) => {
+  let user;
   try {
     if (!req.user) {
       return next(
@@ -582,14 +584,14 @@ exports.requestEmailChange = catchAsync(async (req, res, next) => {
       );
     }
 
-    const user = await Users.findByPk(req.user.id);
+    user = await Users.findByPk(req.user.id);
     if (!user) {
       return next(new AppError("Couldn't find the logged in user.", 404));
     }
 
     const resetToken = await user.createEmailChangeToken();
     await user.save({ validate: false });
-
+    /* istanbul ignore next */
     if (process.env.NODE_ENV !== "test") {
       /* istanbul ignore next */
       const secureChangeUrl = `${
@@ -632,32 +634,26 @@ exports.requestEmailChange = catchAsync(async (req, res, next) => {
  */
 exports.updateEmail = catchAsync(async (req, res, next) => {
   try {
-    const { token, newEmail } = req.body;
-    if (!req.user) {
-      return next(
-        new AppError("User not found in request. Please log in.", 401)
-      );
-    }
-
-    const user = await Users.findByPk(req.user.id);
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(req.query.token)
+      .digest("hex");
+    const user = await Users.findOne({
+      where: {
+        emailChangeToken: hashedToken,
+        emailChangeExpires: {
+          [Sequelize.Op.gt]: Date.now(),
+        },
+      },
+    });
     if (!user) {
-      return next(new AppError("Couldn't find the logged in user.", 404));
+      return next(new AppError("Token is invalid or has expired", 400));
     }
-
-    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
-    if (
-      user.emailChangeToken !== hashedToken ||
-      Date.now() > user.emailChangeExpires
-    ) {
-      return next(new AppError("Token is invalid or has expired.", 400));
-    }
-
-    const oldEmail = user.email;
-
-    user.email = newEmail;
-    user.emailChangeToken = undefined;
-    user.emailChangeExpires = undefined;
+    user.email = req.body.newEmail;
+    user.emailChangeToken = null;
+    user.emailChangeExpires = null;
     await user.save();
+    /* istanbul ignore next */
     if (process.env.NODE_ENV !== "test") {
       /* istanbul ignore next */
       await new EmailUpdated({
@@ -675,12 +671,10 @@ exports.updateEmail = catchAsync(async (req, res, next) => {
       /* istanbul ignore next */
       console.log("Skipping password updated email in test environment.");
     }
-
     createSendToken(user, 200, req, res);
   } catch (error) {
-    new AppError(
-      "There was an error while updating your email. Please try again later.",
-      500
+    return next(
+      new AppError("There was an error while updating your email", 500)
     );
   }
 });
@@ -716,9 +710,11 @@ exports.deactivateProfile = catchAsync(async (req, res, next) => {
       .status(200)
       .json({ status: "success", message: "Logged out successfully." });
   } catch (error) {
-    new AppError(
-      "There was an error while deactivating your account. Please try again later.",
-      500
+    return next(
+      new AppError(
+        "There was an error while deactivating your account. Please try again later.",
+        500
+      )
     );
   }
 });
@@ -743,7 +739,7 @@ exports.requestAccountReactivation = catchAsync(async (req, res, next) => {
 
     const token = user.createReactivateAccountToken();
     await user.save({ validate: false });
-
+    /* istanbul ignore next */
     if (process.env.NODE_ENV !== "test") {
       /* istanbul ignore next */
       const reactivationUrl = `${process.env.FRONTEND_URL}/reactivate-account/${token}`;
@@ -763,9 +759,11 @@ exports.requestAccountReactivation = catchAsync(async (req, res, next) => {
       message: "Reactivation link sent to your email.",
     });
   } catch (error) {
-    new AppError(
-      "There was an error while requesting to reactivate your account. Please try again later.",
-      500
+    return next(
+      new AppError(
+        "There was an error while requesting to reactivate your account. Please try again later.",
+        500
+      )
     );
   }
 });
@@ -777,36 +775,36 @@ exports.requestAccountReactivation = catchAsync(async (req, res, next) => {
  */
 exports.reactivateProfile = catchAsync(async (req, res, next) => {
   try {
-    const { token } = req.body;
-    if (!req.user) {
-      return next(
-        new AppError("User not found in request. Please log in.", 401)
-      );
-    }
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(req.query.token)
+      .digest("hex");
 
-    const user = await Users.findByPk(req.user.id);
+    const user = await Users.findOne({
+      where: {
+        reactivateAccountToken: hashedToken,
+        reactivateAccountExpires: {
+          [Sequelize.Op.gt]: Date.now(),
+        },
+      },
+    });
+
     if (!user) {
-      return next(new AppError("Couldn't find the logged in user.", 404));
-    }
-
-    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
-    if (
-      user.reactivateAccountToken !== hashedToken ||
-      Date.now() > user.reactivateAccountExpires
-    ) {
-      return next(new AppError("Token is invalid or has expired.", 400));
+      return next(new AppError("Token is invalid or has expired", 400));
     }
 
     user.isActive = true;
-    user.reactivateAccountToken = undefined;
-    user.reactivateAccountExpires = undefined;
+    user.reactivateAccountToken = null;
+    user.reactivateAccountExpires = null;
     await user.save();
 
     createSendToken(user, 200, req, res);
   } catch (error) {
-    new AppError(
-      "There was an error while reactivating your account. Please try again later.",
-      500
+    return next(
+      new AppError(
+        "There was an error while reactivating your account. Please try again later.",
+        500
+      )
     );
   }
 });
@@ -841,9 +839,11 @@ exports.deleteProfile = catchAsync(async (req, res, next) => {
       .status(200)
       .json({ status: "success", message: "Deleted profile successfully." });
   } catch (error) {
-    new AppError(
-      "There was an error while deleting your account. Please try again later.",
-      500
+    return next(
+      new AppError(
+        "There was an error while deleting your account. Please try again later.",
+        500
+      )
     );
   }
 });

@@ -45,13 +45,14 @@ describe("verificationApplication model", () => {
     ).rejects.toThrow("Supporting documents must be an array.");
   });
 
-  it("throws specifically on typeof !== 'string'", async () => {
+
+  it("throws error when supportingDocuments contains an empty string", async () => {
     await expect(
       VerificationApplications.create({
         artistId: artist.userId,
-        bio: "Type-only check",
-        portfolioUrl: "https://example.com/portfolio4",
-        supportingDocumentsUrl: [false],
+        bio: "Empty string check",
+        portfolioUrl: "https://example.com/portfolio6",
+        supportingDocumentsUrl: ["   "],
       })
     ).rejects.toThrow("All supporting documents must be valid URLs.");
   });

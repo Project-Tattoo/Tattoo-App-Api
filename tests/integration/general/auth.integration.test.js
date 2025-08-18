@@ -292,7 +292,6 @@ describe("Auth API Integration Tests", () => {
 
   describe("Password Reset", () => {
     it("should successfully reset password", async () => {
-      // 1. Create test user directly in the test
       const testUser = await Users.create({
         firstName: "Test",
         lastName: "User",
@@ -304,7 +303,6 @@ describe("Auth API Integration Tests", () => {
         verifiedEmail: false,
       });
 
-      // 2. Generate and set the reset token (EXACTLY as your auth controller does)
       const validToken = "valid-reset-token-123";
       const hashedToken = crypto
         .createHash("sha256")
@@ -313,23 +311,20 @@ describe("Auth API Integration Tests", () => {
 
       await testUser.update({
         passwordResetToken: hashedToken,
-        passwordResetExpires: new Date(Date.now() + 3600000), // 1 hour from now
+        passwordResetExpires: new Date(Date.now() + 3600000),
       });
 
-      // 3. Make the request
       const res = await request(app)
-        .patch("/api/v1/auth/resetPassword") // or .post()
+        .patch("/api/v1/auth/resetPassword")
         .query({ token: validToken })
         .send({
           password: "NewPassword123!",
           passwordConfirm: "NewPassword123!",
         });
 
-      // 4. Verify success response
       expect(res.status).toBe(200);
       expect(res.body.token).toBeDefined();
 
-      // 5. Verify database updates
       const updatedUser = await Users.findOne({
         where: { email: "reset-test@example.com" },
       });
@@ -337,8 +332,225 @@ describe("Auth API Integration Tests", () => {
       expect(updatedUser.passwordResetToken).toBeNull();
       expect(updatedUser.passwordResetExpires).toBeNull();
 
-      // Cleanup
       await Users.destroy({ where: { email: "reset-test@example.com" } });
+    });
+  });
+
+  describe("Update Password", () => {
+    it("should successfully update password", async () => {
+      const testUser = await Users.create({
+        firstName: "Test",
+        lastName: "User",
+        email: "updatepass@example.com",
+        passwordHash: "originalPass123",
+        role: "user",
+        displayName: "Update Test",
+        isActive: true,
+        verifiedEmail: true,
+        profilePictureUrl: "https://example.com/profile.jpg",
+        socialMediaLinks: {},
+      });
+
+      const loginRes = await request(app).post("/api/v1/auth/login").send({
+        email: "updatepass@example.com",
+        password: "originalPass123",
+      });
+
+      const authToken = loginRes.body.token;
+
+      const res = await request(app)
+        .patch("/api/v1/auth/updatePassword")
+        .set("Authorization", `Bearer ${authToken}`)
+        .send({
+          passwordCurrent: "originalPass123",
+          password: "NewSecurePassword123!",
+          passwordConfirm: "NewSecurePassword123!",
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.token).toBeDefined();
+      expect(res.body.data.user.email).toBe("updatepass@example.com");
+
+      const updatedUser = await Users.findOne({
+        where: { email: "updatepass@example.com" },
+      });
+      expect(await updatedUser.correctPassword("NewSecurePassword123!")).toBe(
+        true
+      );
+
+      await Users.destroy({ where: { email: "updatepass@example.com" } });
+    });
+  });
+
+  describe("Update Email", () => {
+    it("should successfully update email with valid token", async () => {
+      const rawToken = "valid-email-token";
+      const hashedToken = crypto
+        .createHash("sha256")
+        .update(rawToken)
+        .digest("hex");
+
+      const testUser = await Users.create({
+        firstName: "Test",
+        lastName: "User",
+        email: "old@example.com",
+        passwordHash: "password123!",
+        role: "user",
+        displayName: "UpdateEmailTest",
+        isActive: true,
+        verifiedEmail: true,
+        emailChangeToken: hashedToken,
+        emailChangeExpires: new Date(Date.now() + 3600000),
+        profilePictureUrl: "https://example.com/profile.jpg",
+        socialMediaLinks: {},
+      });
+
+      const loginRes = await request(app).post("/api/v1/auth/login").send({
+        email: "old@example.com",
+        password: "password123!",
+      });
+
+      const authToken = loginRes.body.token;
+
+      const res = await request(app)
+        .patch("/api/v1/auth/updateEmail")
+        .set("Authorization", `Bearer ${authToken}`)
+        .query({ token: rawToken })
+        .send({
+          newEmail: "new@example.com",
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.token).toBeDefined();
+      expect(res.body.data.user.email).toBe("new@example.com");
+
+      const updatedUser = await Users.findOne({
+        where: { id: testUser.id },
+      });
+      expect(updatedUser.email).toBe("new@example.com");
+      expect(updatedUser.emailChangeToken).toBeNull();
+      expect(updatedUser.emailChangeExpires).toBeNull();
+
+      await Users.destroy({ where: { id: testUser.id } });
+    });
+  });
+
+  describe("Deactivate Profile", () => {
+    it("should successfully deactivate profile", async () => {
+      const testUser = await Users.create({
+        firstName: "Test",
+        lastName: "User",
+        email: "deactivate@example.com",
+        passwordHash: "password123!",
+        role: "user",
+        displayName: "deactivateprofiletest",
+        isActive: true,
+        verifiedEmail: true,
+        profilePictureUrl: "https://example.com/profile.jpg",
+        socialMediaLinks: {},
+      });
+
+      const loginRes = await request(app)
+        .post("/api/v1/auth/login")
+        .send({ email: "deactivate@example.com", password: "password123!" });
+
+      const authToken = loginRes.body.token;
+
+      const res = await request(app)
+        .patch("/api/v1/auth/deactivateProfile")
+        .set("Authorization", `Bearer ${authToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toMatch(/logged out successfully/i);
+      expect(res.headers["set-cookie"]).toBeDefined();
+
+      const updatedUser = await Users.findOne({
+        where: { email: "deactivate@example.com" },
+      });
+      expect(updatedUser.isActive).toBe(false);
+
+      await Users.destroy({ where: { email: "deactivate@example.com" } });
+    });
+  });
+
+  describe("Delete Profile", () => {
+    it("should successfully delete a user", async () => {
+      const testUser = await Users.create({
+        firstName: "Test",
+        lastName: "User",
+        email: "delete@example.com",
+        passwordHash: "password123",
+        role: "user",
+        displayName: "deletetest",
+        isActive: true,
+        verifiedEmail: true,
+      });
+
+      const deleteRes = await request(app).post("/api/v1/auth/login").send({
+        email: "delete@example.com",
+        password: "password123",
+      });
+
+      const authToken = deleteRes.body.token;
+
+      const res = await request(app)
+        .delete("/api/v1/auth/deleteProfile")
+        .set("Authorization", `Bearer ${authToken}`)
+        .send();
+
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({
+        status: "success",
+        message: "Deleted profile successfully.",
+      });
+
+      const setCookie = res.headers["set-cookie"].find((c) =>
+        c.startsWith("jwt=deleted")
+      );
+      expect(setCookie).toBeDefined();
+      expect(setCookie).toContain("HttpOnly");
+
+      const deletedUser = await Users.findByPk(testUser.id);
+      expect(deletedUser).toBeNull();
+    });
+  });
+
+  describe("Reactivate Profile", () => {
+    it("should successfully reactivate profile with valid token", async () => {
+      const rawToken = "valid-reactivation-token";
+      const hashedToken = crypto
+        .createHash("sha256")
+        .update(rawToken)
+        .digest("hex");
+
+      const testUser = await Users.create({
+        firstName: "Test",
+        lastName: "User",
+        email: "reactivate@example.com",
+        passwordHash: "password123",
+        role: "user",
+        displayName: "reactivatetest",
+        isActive: true,
+        verifiedEmail: true,
+        reactivateAccountToken: hashedToken,
+        reactivateAccountExpires: new Date(Date.now() + 3600000),
+      });
+
+      const res = await request(app)
+        .patch("/api/v1/auth/reactivateProfile")
+        .query({ token: rawToken });
+
+      expect(res.status).toBe(200);
+      expect(res.body.token).toBeDefined();
+
+      const updatedUser = await Users.findOne({
+        where: { email: "reactivate@example.com" },
+      });
+      expect(updatedUser.isActive).toBe(true);
+      expect(updatedUser.reactivateAccountToken).toBeNull();
+      expect(updatedUser.reactivateAccountExpires).toBeNull();
+
+      await Users.destroy({ where: { email: "reactivate@example.com" } });
     });
   });
 });
