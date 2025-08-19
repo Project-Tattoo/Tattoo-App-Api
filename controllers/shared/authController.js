@@ -65,8 +65,7 @@ exports.validateToken = catchAsync(async (req, res, next) => {
  * @param {Object} User - The Sequelize User model.
  * @returns {Function} An Express middleware function.
  */
-exports.protect = (User) =>
-  catchAsync(async (req, res, next) => {
+exports.protect = catchAsync(async (req, res, next) => {
     let token;
     if (
       req.headers.authorization &&
@@ -91,7 +90,7 @@ exports.protect = (User) =>
         : process.env.DEV_JWT_SECRET
     );
 
-    const currentUser = await User.findByPk(decoded.id);
+    const currentUser = await Users.findByPk(decoded.id);
     if (!currentUser) {
       return next(
         new AppError("The user belonging to this token no longer exists.", 401)

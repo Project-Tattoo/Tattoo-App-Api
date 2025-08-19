@@ -227,7 +227,7 @@ Users.prototype.correctPassword = async function (
   return await bcrypt.compare(candidatePassword, this.passwordHash);
 };
 
-Users.prototype.changedPasswordAfter = function (JWTTimestamp) {
+Users.prototype.changedPasswordAfter = async function (JWTTimestamp) {
   if (!this.passwordChangedAt) return false;
   const changedTimestamp = parseInt(
     this.passwordChangedAt.getTime() / 1000,
