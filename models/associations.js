@@ -88,6 +88,15 @@ CommissionArtworks.belongsTo(Users, {
   as: "provider",
 });
 
+Users.hasMany(CommissionArtworks, {
+  foreignKey: "recipientId",
+  as: "publicReceivedArtworks",
+});
+CommissionArtworks.belongsTo(Users, {
+  foreignKey: "recipientId",
+  as: "recipient",
+});
+
 CommissionReviews.hasOne(CommissionArtworks, {
   foreignKey: "reviewId",
   onDelete: "SET NULL",
