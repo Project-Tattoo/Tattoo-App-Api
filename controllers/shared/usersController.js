@@ -90,7 +90,7 @@ exports.updateMe = catchAsync(async (req, res, next) => {
 
     await Users.update(filteredBody, { where: { id: req.user.id } });
 
-    const updatedUser = Users.findByPk(req.user.id, {
+    const updatedUser = await Users.findByPk(req.user.id, {
       include: [
         {
           model: EmailPreferences,
@@ -102,7 +102,9 @@ exports.updateMe = catchAsync(async (req, res, next) => {
         },
         {
           model: ArtistDetails,
-          attributes: { exclude: ["createdAt", "updatedAt"] },
+          attributes: {
+            exclude: ["paymentPlatformId", "createdAt", "updatedAt"],
+          },
           include: [
             {
               model: VerificationApplications,
@@ -146,7 +148,7 @@ exports.getUsersPublicProfile = catchAsync(async (req, res, next) => {
     // a count of their CommissionListings as well as their 5 most viewed listings through the "totalViews" key,
     // and their PortfolioCollections
     const user = await Users.findOne({
-      where: { publicId: req.params.id },
+      where: { publicId: req.params.publicId },
       attributes: [
         "id",
         "publicId",
@@ -162,30 +164,27 @@ exports.getUsersPublicProfile = catchAsync(async (req, res, next) => {
         "isActive",
         [
           db.literal(`(
-            SELECT COUNT(*)
-            FROM "favoriteArtists" AS "FavoriteArtists"
-            WHERE
-              "FavoriteArtists"."userId" = "Users"."id"
-          )`),
-          "favoriteArtistsCount",
-        ],
-        [
-          db.literal(`(
-            SELECT COUNT(*)
-            FROM "favoriteDesigns" AS "FavoriteDesigns"
-            WHERE
-              "FavoriteDesigns"."userId" = "Users"."id"
-          )`),
+      SELECT COUNT(*)
+      FROM "favoriteDesigns" AS fd
+      WHERE fd."userId" = "users"."id"
+    )`),
           "favoriteDesignsCount",
         ],
         [
           db.literal(`(
-            SELECT COUNT(*)
-            FROM "commissionListings" AS "CommissionListings"
-            WHERE
-              "CommissionListings"."artistId" = "Users"."id"
-          )`),
-          "commissionListingsCount",
+      SELECT COUNT(*)
+      FROM "favoriteArtists" AS fa
+      WHERE fa."userId" = "users"."id"
+    )`),
+          "favoriteArtistsCount",
+        ],
+        [
+          db.literal(`(
+    SELECT COUNT(*)
+    FROM "favoriteArtists" AS fa
+    WHERE fa."artistId" = "users"."id"
+  )`),
+          "favoritedByOthersCount",
         ],
       ],
       include: [
@@ -193,10 +192,26 @@ exports.getUsersPublicProfile = catchAsync(async (req, res, next) => {
           model: ArtistDetails,
           as: "artistDetail",
           attributes: { exclude: ["createdAt", "updatedAt"] },
+          include: [
+            {
+              model: PortfolioCollections,
+              as: "portfolioCollections",
+              required: false,
+              attributes: { exclude: ["createdAt", "updatedAt"] },
+            },
+            {
+              model: CommissionListing,
+              as: "commissionListings",
+              required: false,
+              limit: 5,
+              order: [["totalViews", "DESC"]],
+              attributes: { exclude: ["createdAt", "updatedAt"] },
+            },
+          ],
         },
         {
           model: CommissionArtworks,
-          as: "commissionArtworks",
+          association: "providedArtworks",
           required: false,
           where: { isPublic: true },
           limit: 5,
@@ -204,17 +219,12 @@ exports.getUsersPublicProfile = catchAsync(async (req, res, next) => {
           attributes: { exclude: ["createdAt", "updatedAt"] },
         },
         {
-          model: CommissionListing,
-          as: "commissionListings",
+          model: CommissionArtworks,
+          association: "receivedArtworks",
           required: false,
+          where: { isPublic: true },
           limit: 5,
-          order: [["totalViews", "DESC"]],
-          attributes: { exclude: ["createdAt", "updatedAt"] },
-        },
-        {
-          model: PortfolioCollections,
-          as: "portfolioCollections",
-          required: false,
+          order: [["createdAt", "DESC"]],
           attributes: { exclude: ["createdAt", "updatedAt"] },
         },
       ],

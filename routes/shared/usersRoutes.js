@@ -7,10 +7,10 @@ usersRouter
   .route("/me")
   .get(authController.protect, usersController.getMe)
   .patch(authController.protect, usersController.updateMe);
-usersRouter.route("/:publidId").get(usersController.getUsersPublicProfile);
 usersRouter
   .route("/recommended-artists")
   .get(usersController.getRecommendedArtists);
 usersRouter.route("/all-artists").get(usersController.getAllArtists);
+usersRouter.route("/:publicId").get(usersController.getUsersPublicProfile);
 
 module.exports = usersRouter;
