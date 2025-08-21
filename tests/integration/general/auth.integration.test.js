@@ -9,7 +9,7 @@ const crypto = require("crypto");
 
 require("dotenv").config({ path: "./.env.test" });
 
-describe("Auth API Integration Tests", () => {
+describe("authController Integration Tests", () => {
   beforeEach(async () => {
     await Users.destroy({ truncate: true, cascade: true });
   });

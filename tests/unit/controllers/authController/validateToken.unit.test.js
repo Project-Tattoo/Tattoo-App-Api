@@ -1,5 +1,5 @@
 const jwt = require("jsonwebtoken");
-const authController = require("./../../../../controllers/general/authController");
+const authController = require("./../../../../controllers/shared/authController");
 const { mockRequest, mockResponse } = require("../../../utils/mockExpress");
 
 describe("validateToken", () => {

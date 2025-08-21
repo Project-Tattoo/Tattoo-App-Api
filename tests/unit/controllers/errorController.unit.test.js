@@ -1,4 +1,4 @@
-const errorHandler = require("../../../controllers/general/errorController");
+const errorHandler = require("../../../controllers/shared/errorController");
 const AppError = require("../../../utils/appError");
 const { mockRequest, mockResponse } = require("../../utils/mockExpress");
 
