@@ -1,6 +1,5 @@
 const jwt = require("jsonwebtoken");
-const { promisify } = require("util");
-const authController = require("./../../../../controllers/general/authController");
+const authController = require("./../../../../controllers/shared/authController");
 const AppError = require("../../../../utils/appError");
 const Users = require("../../../../models/shared/Users");
 const { mockRequest, mockResponse } = require("../../../utils/mockExpress");
@@ -18,8 +17,7 @@ describe("protect", () => {
   it("should call AppError when a user is not logged in", async () => {
     req = mockRequest({ headers: {}, cookies: {} });
 
-    const protectMiddleware = authController.protect(Users);
-    await protectMiddleware(req, res, next);
+    await authController.protect(req, res, next);
 
     const err = next.mock.calls[0][0];
     expect(next).toHaveBeenCalled();
@@ -34,21 +32,17 @@ describe("protect", () => {
       cookies: {},
     });
 
-    jest.spyOn(jwt, "verify").mockImplementation((token, secret, callback) => {
-      setTimeout(() => {
-        callback(new jwt.JsonWebTokenError("jwt malformed"));
-      }, 0);
-    });
+    jest.spyOn(jwt, "verify").mockImplementation((token, secret, cb) =>
+      setTimeout(() => cb(new jwt.JsonWebTokenError("jwt malformed")), 0)
+    );
 
-    const protectMiddleware = authController.protect(Users);
     await new Promise((resolve) => {
-      protectMiddleware(req, res, (...args) => {
+      authController.protect(req, res, (...args) => {
         next(...args);
         resolve();
       });
     });
 
-    expect(next).toHaveBeenCalled();
     const err = next.mock.calls[0][0];
     expect(err).toBeInstanceOf(jwt.JsonWebTokenError);
     expect(err.message).toMatch(/jwt malformed/i);
@@ -62,21 +56,20 @@ describe("protect", () => {
       cookies: {},
     });
 
-    jest.spyOn(jwt, "verify").mockImplementation((token, secret, callback) => {
-      setTimeout(() => callback(null, { id: 999, iat: Date.now() / 1000 }), 0);
-    });
+    jest.spyOn(jwt, "verify").mockImplementation((token, secret, cb) =>
+      setTimeout(() => cb(null, { id: 999, iat: Date.now() / 1000 }), 0)
+    );
 
-    const mockUsers = { findByPk: jest.fn().mockResolvedValue(null) };
-    const protectMiddleware = authController.protect(mockUsers);
+    jest.spyOn(Users, "findByPk").mockResolvedValue(null);
 
     await new Promise((resolve) => {
-      protectMiddleware(req, res, (...args) => {
+      authController.protect(req, res, (...args) => {
         next(...args);
         resolve();
       });
     });
 
-    expect(mockUsers.findByPk).toHaveBeenCalledWith(999);
+    expect(Users.findByPk).toHaveBeenCalledWith(999);
     const err = next.mock.calls[0][0];
     expect(err).toBeInstanceOf(AppError);
     expect(err.message).toMatch(/no longer exists/i);
@@ -91,19 +84,18 @@ describe("protect", () => {
       cookies: {},
     });
 
-    jest.spyOn(jwt, "verify").mockImplementation((token, secret, callback) => {
+    jest.spyOn(jwt, "verify").mockImplementation((token, secret, cb) =>
       setTimeout(
-        () => callback(null, { id: 123, iat: Math.floor(Date.now() / 1000) - 100 }),
+        () => cb(null, { id: 123, iat: Math.floor(Date.now() / 1000) - 100 }),
         0
-      );
-    });
+      )
+    );
 
     const fakeUser = { changedPasswordAfter: jest.fn().mockResolvedValue(true) };
-    const mockUsers = { findByPk: jest.fn().mockResolvedValue(fakeUser) };
+    jest.spyOn(Users, "findByPk").mockResolvedValue(fakeUser);
 
-    const protectMiddleware = authController.protect(mockUsers);
     await new Promise((resolve) => {
-      protectMiddleware(req, res, (...args) => {
+      authController.protect(req, res, (...args) => {
         next(...args);
         resolve();
       });
@@ -124,23 +116,28 @@ describe("protect", () => {
       cookies: {},
     });
 
-    const fakeUser = { id: 123, email: "user@example.com", changedPasswordAfter: jest.fn().mockResolvedValue(false) };
-    const mockUsers = { findByPk: jest.fn().mockResolvedValue(fakeUser) };
+    const fakeUser = {
+      id: 123,
+      email: "user@example.com",
+      changedPasswordAfter: jest.fn().mockResolvedValue(false),
+    };
 
-    jest.spyOn(jwt, "verify").mockImplementation((token, secret, callback) => {
-      setTimeout(() => callback(null, { id: fakeUser.id, iat: Math.floor(Date.now() / 1000) - 100 }), 0);
-    });
+    jest.spyOn(Users, "findByPk").mockResolvedValue(fakeUser);
+    jest.spyOn(jwt, "verify").mockImplementation((token, secret, cb) =>
+      setTimeout(
+        () => cb(null, { id: fakeUser.id, iat: Math.floor(Date.now() / 1000) - 100 }),
+        0
+      )
+    );
 
-    const protectMiddleware = authController.protect(mockUsers);
     await new Promise((resolve) => {
-      protectMiddleware(req, res, (...args) => {
+      authController.protect(req, res, (...args) => {
         next(...args);
         resolve();
       });
     });
 
-    expect(jwt.verify).toHaveBeenCalled();
-    expect(mockUsers.findByPk).toHaveBeenCalledWith(fakeUser.id);
+    expect(Users.findByPk).toHaveBeenCalledWith(fakeUser.id);
     expect(fakeUser.changedPasswordAfter).toHaveBeenCalled();
     expect(req.user).toBe(fakeUser);
     expect(res.locals.user).toBe(fakeUser);
@@ -155,16 +152,21 @@ describe("protect", () => {
       cookies: { jwt: "cookie.jwt.token" },
     });
 
-    const fakeUser = { id: 123, changedPasswordAfter: jest.fn().mockResolvedValue(false) };
-    const mockUsers = { findByPk: jest.fn().mockResolvedValue(fakeUser) };
+    const fakeUser = {
+      id: 123,
+      changedPasswordAfter: jest.fn().mockResolvedValue(false),
+    };
 
-    jest.spyOn(jwt, "verify").mockImplementation((token, secret, callback) => {
-      setTimeout(() => callback(null, { id: fakeUser.id, iat: Math.floor(Date.now() / 1000) }), 0);
-    });
+    jest.spyOn(Users, "findByPk").mockResolvedValue(fakeUser);
+    jest.spyOn(jwt, "verify").mockImplementation((token, secret, cb) =>
+      setTimeout(
+        () => cb(null, { id: fakeUser.id, iat: Math.floor(Date.now() / 1000) }),
+        0
+      )
+    );
 
-    const protectMiddleware = authController.protect(mockUsers);
     await new Promise((resolve) => {
-      protectMiddleware(req, res, (...args) => {
+      authController.protect(req, res, (...args) => {
         next(...args);
         resolve();
       });
@@ -177,7 +179,7 @@ describe("protect", () => {
         : process.env.DEV_JWT_SECRET,
       expect.any(Function)
     );
-    expect(mockUsers.findByPk).toHaveBeenCalledWith(fakeUser.id);
+    expect(Users.findByPk).toHaveBeenCalledWith(fakeUser.id);
     expect(req.user).toBe(fakeUser);
     expect(res.locals.user).toBe(fakeUser);
     expect(next).toHaveBeenCalledWith();

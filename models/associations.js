@@ -81,11 +81,20 @@ CommissionArtworks.belongsTo(CommissionOrders, {
 
 Users.hasMany(CommissionArtworks, {
   foreignKey: "providerId",
-  as: "publicArtworks",
+  as: "providedArtworks",
 });
 CommissionArtworks.belongsTo(Users, {
   foreignKey: "providerId",
   as: "provider",
+});
+
+Users.hasMany(CommissionArtworks, {
+  foreignKey: "recipientId",
+  as: "receivedArtworks",
+});
+CommissionArtworks.belongsTo(Users, {
+  foreignKey: "recipientId",
+  as: "recipient",
 });
 
 CommissionReviews.hasOne(CommissionArtworks, {

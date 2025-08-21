@@ -1,0 +1,337 @@
+const { Sequelize } = require("sequelize");
+const db = require("./../../server");
+const AppError = require("../../utils/appError");
+const catchAsync = require("./../../utils/catchAsync");
+const Users = require("./../../models/shared/Users");
+const EmailPreferences = require("./../../models/shared/EmailPreferences");
+const TOSAgreement = require("./../../models/shared/TOSAgreement");
+const ArtistDetails = require("./../../models/artists/ArtistDetails");
+const VerificationApplications = require("./../../models/artists/VerificationApplications");
+const FavoriteAritsts = require("./../../models/shared/FavoriteArtists");
+const FavoriteDesigns = require("./../../models/shared/FavoriteDesigns");
+const CommissionArtworks = require("./../../models/shared/CommissionArtworks");
+const CommissionListing = require("./../../models/artists/CommissionListing");
+const PortfolioCollections = require("./../../models/artists/PortfolioCollections");
+
+exports.getMe = catchAsync(async (req, res, next) => {
+  const userId = req.user.id;
+
+  const user = await Users.findByPk(userId, {
+    include: [
+      {
+        model: EmailPreferences,
+        attributes: { exclude: ["createdAt", "updatedAt"] },
+      },
+      {
+        model: TOSAgreement,
+        attributes: { exclude: ["createdAt", "updatedAt"] },
+      },
+      {
+        model: ArtistDetails,
+        attributes: { exclude: ["createdAt", "updatedAt"] },
+        include: [
+          {
+            model: VerificationApplications,
+            attributes: { exclude: ["createdAt", "updatedAt"] },
+          },
+        ],
+      },
+    ],
+    attributes: {
+      exclude: [
+        "passwordHash",
+        "stripeCustomerId",
+        "lastActivityAt",
+        "passwordChangedAt",
+        "passwordResetToken",
+        "passwordResetExpires",
+        "emailChangeToken",
+        "emailChangeExpires",
+        "reactivateAccountToken",
+        "reactivateAccountExpires",
+        "verifyToken",
+        "verifyExpires",
+        "createdAt",
+        "updatedAt",
+      ],
+    },
+  });
+
+  res.status(200).json({
+    status: "success",
+    data: { user },
+  });
+});
+
+exports.updateMe = catchAsync(async (req, res, next) => {
+  const filteredBody = {};
+  const allowedFields = [
+    "firstName",
+    "lastName",
+    "displayName",
+    "bio",
+    "socialMediaLinks",
+  ];
+
+  Object.keys(req.body).forEach((key) => {
+    if (allowedFields.includes(key)) {
+      filteredBody[key] = req.body[key];
+    }
+  });
+
+  await Users.update(filteredBody, { where: { id: req.user.id } });
+
+  const updatedUser = await Users.findByPk(req.user.id, {
+    include: [
+      {
+        model: EmailPreferences,
+        attributes: { exclude: ["createdAt", "updatedAt"] },
+      },
+      {
+        model: TOSAgreement,
+        attributes: { exclude: ["createdAt", "updatedAt"] },
+      },
+      {
+        model: ArtistDetails,
+        attributes: {
+          exclude: ["paymentPlatformId", "createdAt", "updatedAt"],
+        },
+        include: [
+          {
+            model: VerificationApplications,
+            attributes: { exclude: ["createdAt", "updatedAt"] },
+          },
+        ],
+      },
+    ],
+    attributes: {
+      exclude: [
+        "passwordHash",
+        "stripeCustomerId",
+        "lastActivityAt",
+        "passwordChangedAt",
+        "passwordResetToken",
+        "passwordResetExpires",
+        "emailChangeToken",
+        "emailChangeExpires",
+        "reactivateAccountToken",
+        "reactivateAccountExpires",
+        "verifyToken",
+        "verifyExpires",
+        "createdAt",
+        "updatedAt",
+      ],
+    },
+  });
+
+  res.status(200).json({ status: "success", data: { updatedUser } });
+});
+
+exports.getUsersPublicProfile = catchAsync(async (req, res, next) => {
+  // We need to include artistDetails, a count of FavoriteArtists, a count of FavoriteDesigns,
+  // the 5 most recent CommissionArtworks that have a isPublic value of true,
+  // a count of their CommissionListings as well as their 5 most viewed listings through the "totalViews" key,
+  // and their PortfolioCollections
+  const user = await Users.findOne({
+    where: { publicId: req.params.publicId },
+    attributes: [
+      "id",
+      "publicId",
+      "firstName",
+      "lastName",
+      "displayName",
+      "bio",
+      "socialMediaLinks",
+      "profilePictureUrl",
+      "totalViews",
+      "totalFollowers",
+      "role",
+      "isActive",
+      [
+        db.literal(`(
+      SELECT COUNT(*)
+      FROM "favoriteDesigns" AS fd
+      WHERE fd."userId" = "users"."id"
+    )`),
+        "favoriteDesignsCount",
+      ],
+      [
+        db.literal(`(
+      SELECT COUNT(*)
+      FROM "favoriteArtists" AS fa
+      WHERE fa."userId" = "users"."id"
+    )`),
+        "favoriteArtistsCount",
+      ],
+      [
+        db.literal(`(
+    SELECT COUNT(*)
+    FROM "favoriteArtists" AS fa
+    WHERE fa."artistId" = "users"."id"
+  )`),
+        "favoritedByOthersCount",
+      ],
+    ],
+    include: [
+      {
+        model: ArtistDetails,
+        as: "artistDetail",
+        attributes: { exclude: ["createdAt", "updatedAt"] },
+        include: [
+          {
+            model: PortfolioCollections,
+            as: "portfolioCollections",
+            required: false,
+            attributes: { exclude: ["createdAt", "updatedAt"] },
+          },
+          {
+            model: CommissionListing,
+            as: "commissionListings",
+            required: false,
+            limit: 5,
+            order: [["totalViews", "DESC"]],
+            attributes: { exclude: ["createdAt", "updatedAt"] },
+          },
+        ],
+      },
+      {
+        model: CommissionArtworks,
+        association: "providedArtworks",
+        required: false,
+        where: { isPublic: true },
+        limit: 5,
+        order: [["createdAt", "DESC"]],
+        attributes: { exclude: ["createdAt", "updatedAt"] },
+      },
+      {
+        model: CommissionArtworks,
+        association: "receivedArtworks",
+        required: false,
+        where: { isPublic: true },
+        limit: 5,
+        order: [["createdAt", "DESC"]],
+        attributes: { exclude: ["createdAt", "updatedAt"] },
+      },
+    ],
+  });
+
+  if (!user) {
+    return next(new AppError("User not found", 404));
+  }
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      user,
+    },
+  });
+});
+
+exports.getRecommendedArtists = catchAsync(async (req, res, next) => {
+
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const offset = (page - 1) * limit;
+
+    const artists = await Users.findAll({
+      where: {
+        role: "artist",
+        isActive: true,
+      },
+      attributes: {
+        exclude: [
+          "passwordHash",
+          "stripeCustomerId",
+          "lastActivityAt",
+          "passwordChangedAt",
+          "passwordResetToken",
+          "passwordResetExpires",
+          "emailChangeToken",
+          "emailChangeExpires",
+          "reactivateAccountToken",
+          "reactivateAccountExpires",
+          "verifyToken",
+          "verifyExpires",
+          "createdAt",
+          "updatedAt",
+        ],
+      },
+      include: [
+        {
+          model: ArtistDetails,
+          as: "artistDetail",
+          attributes: [
+            "averageRating",
+            "totalReviews",
+            "totalCommissionsCompleted",
+            "isVerified",
+            "stylesOffered",
+          ],
+        },
+      ],
+      order: [
+        [db.literal('"artistDetail"."isVerified"'), "DESC"],
+        [db.literal('"artistDetail"."averageRating"'), "DESC"],
+        [db.literal('"artistDetail"."totalCommissionsCompleted"'), "DESC"],
+        [db.literal("RANDOM()")],
+      ],
+      limit,
+      offset,
+    });
+
+    if (artists.length === 0) {
+      return next(new AppError("No recommended artists found", 404));
+    }
+
+    res.status(200).json({
+      status: "success",
+      results: artists.length,
+      data: {
+        artists,
+      },
+    });
+});
+
+exports.getAllArtists = catchAsync(async (req, res, next) => {
+  
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const offset = (page - 1) * limit;
+
+    const artists = await Users.findAll({
+      where: { role: "artist", isActive: true },
+      attributes: {
+        exclude: [
+          "passwordHash",
+          "stripeCustomerId",
+          "lastActivityAt",
+          "passwordChangedAt",
+          "passwordResetToken",
+          "passwordResetExpires",
+          "emailChangeToken",
+          "emailChangeExpires",
+          "reactivateAccountToken",
+          "reactivateAccountExpires",
+          "verifyToken",
+          "verifyExpires",
+          "createdAt",
+          "updatedAt",
+        ],
+      },
+      limit,
+      offset,
+    });
+
+    if (artists.length === 0) {
+      return next(new AppError("There were no artists found", 404));
+    }
+
+    res.status(200).json({
+      status: "success",
+      results: artists.length,
+      data: {
+        artists,
+      },
+    });
+  
+});

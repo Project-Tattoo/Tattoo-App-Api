@@ -1,4 +1,4 @@
-const authController = require("./../../../../controllers/general/authController");
+const authController = require("./../../../../controllers/shared/authController");
 const Users = require("./../../../../models/shared/Users");
 const AppError = require("../../../../utils/appError");
 const { mockRequest, mockResponse } = require("../../../utils/mockExpress");

@@ -221,18 +221,16 @@ const Users = db.define(
   }
 );
 
-Users.prototype.correctPassword = async function (
-  candidatePassword
-) {
+Users.prototype.correctPassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.passwordHash);
 };
 
 Users.prototype.changedPasswordAfter = function (JWTTimestamp) {
-  if (!this.passwordChangedAt) return false;
-  const changedTimestamp = parseInt(
-    this.passwordChangedAt.getTime() / 1000,
-    10
-  );
+  if (!this.passwordChangedAt) {
+    return false;
+  }
+
+  const changedTimestamp = Math.floor(this.passwordChangedAt.getTime() / 1000);
   return JWTTimestamp < changedTimestamp;
 };
 

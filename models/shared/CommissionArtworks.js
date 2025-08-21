@@ -38,6 +38,15 @@ const CommissionArtworks = db.define(
       },
       onDelete: "CASCADE",
     },
+    recipientId: {
+      type: DataTypes.BIGINT,
+      allowNull: false,
+      references: {
+        model: Users,
+        key: "id",
+      },
+      onDelete: "CASCADE",
+    },
     artworkUrl: {
       type: DataTypes.TEXT,
       allowNull: false,
@@ -90,4 +99,4 @@ const CommissionArtworks = db.define(
   }
 );
 
-module.exports = CommissionArtworks
+module.exports = CommissionArtworks;

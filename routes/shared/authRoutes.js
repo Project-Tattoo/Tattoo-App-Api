@@ -1,6 +1,5 @@
 const express = require("express");
-const authController = require("./../../controllers/general/authController");
-const Users = require("./../../models/shared/Users"); 
+const authController = require("./../../controllers/shared/authController");
 
 const authRouter = express.Router();
 
@@ -21,7 +20,7 @@ authRouter.get("/logout", (req, res) => {
 });
 authRouter.patch("/requestReactivation", authController.requestAccountReactivation)
 authRouter.patch("/reactivateProfile", authController.reactivateProfile)
-authRouter.use(authController.protect(Users));
+authRouter.use(authController.protect);
 authRouter.post("/requestPasswordChange", authController.requestPasswordChange);
 authRouter.patch("/updatePassword", authController.updatePassword);
 authRouter.post("/requestEmailChange", authController.requestEmailChange)

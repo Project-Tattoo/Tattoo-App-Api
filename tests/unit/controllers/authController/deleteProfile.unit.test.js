@@ -1,4 +1,4 @@
-const authController = require("./../../../../controllers/general/authController");
+const authController = require("./../../../../controllers/shared/authController");
 const AppError = require("../../../../utils/appError");
 const Users = require("../../../../models/shared/Users");
 
