@@ -32,7 +32,7 @@ exports.getNotifications = catchAsync(async (req, res, next) => {
   });
 });
 
-exports.getUnreadNotificatons = catchAsync(async (req, res, next) => {
+exports.getUnreadNotifications = catchAsync(async (req, res, next) => {
   const unreadNotifications = await Notifications.findAll({
     where: { userId: req.user.id, isRead: false },
     order: [["createdAt", "DESC"]],
@@ -55,18 +55,21 @@ exports.getUnreadNotificatons = catchAsync(async (req, res, next) => {
 });
 
 exports.markNotificationAsRead = catchAsync(async (req, res, next) => {
-  await Notifications.update(
-    { isRead: true },
-    { where: { id: req.params.notificationId } }
-  );
+  console.log(`\n\n\n\n\n notification id ${req.params.notificationId}`)
+  const notification = await Notifications.findByPk(req.params.notificationId);
 
-  const updatedNotification = Notifications.findByPk(req.params.notificationId);
+  if (!notification) {
+    return next(new AppError("Notification not found", 404));
+  }
+
+  await notification.update({ isRead: true });
 
   res.status(200).json({
     status: "success",
-    data: updatedNotification,
+    data: notification,
   });
 });
+
 
 exports.markSelectedNotificationsAsRead = catchAsync(async (req, res, next) => {
   const { ids } = req.body;
@@ -100,7 +103,7 @@ exports.markAllNotificationsAsRead = catchAsync(async (req, res, next) => {
     { where: { userId: req.user.id, isRead: false } }
   );
 
-  const updatedNotifications = Notifications.findAll({
+  const updatedNotifications = await Notifications.findAll({
     where: { userId: req.user.id },
     order: [["createdAt", "DESC"]],
   });
@@ -112,7 +115,7 @@ exports.markAllNotificationsAsRead = catchAsync(async (req, res, next) => {
 });
 
 exports.deleteNotification = catchAsync(async (req, res, next) => {
-  await Notifications.delete({ where: { id: req.params.notificationId } });
+  await Notifications.destroy({ where: { id: req.params.notificationId } });
 
   res
     .status(204)
@@ -120,7 +123,7 @@ exports.deleteNotification = catchAsync(async (req, res, next) => {
 });
 
 exports.deleteAllNotifications = catchAsync(async (req, res, next) => {
-  await Notifications.delete({ where: { userId: req.user.id } });
+  await Notifications.destroy({ where: { userId: req.user.id } });
 
   res.status(204).json({
     status: "success",

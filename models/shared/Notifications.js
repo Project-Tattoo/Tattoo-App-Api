@@ -25,33 +25,33 @@ const Notifications = db.define(
         key: "id",
       },
       onDelete: "CASCADE",
-      notificationType: {
-        type: DataTypes.ENUM(
-          "new_message",
-          "commission_received",
-          "commission_completed",
-          "commission_status_update",
-          "design_favorited",
-          "profile_favorited",
-          "commission_order_placed",
-          "system_alert"
-        ),
-        defaultValue: 'system_alert',
-        allowNull: false,
-      },
-      message: {
-        type: DataTypes.TEXT,
-        allowNull: false,
-      },
-      isRead: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: false,
-        allowNull: false,
-      },
-      metadata: {
-        type: DataTypes.JSONB,
-        allowNull: true,
-      },
+    },
+    notificationType: {
+      type: DataTypes.ENUM(
+        "new_message",
+        "commission_received",
+        "commission_completed",
+        "commission_status_update",
+        "design_favorited",
+        "profile_favorited",
+        "commission_order_placed",
+        "system_alert"
+      ),
+      defaultValue: "system_alert",
+      allowNull: false,
+    },
+    message: {
+      type: DataTypes.TEXT,
+      allowNull: false,
+    },
+    isRead: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      allowNull: false,
+    },
+    metadata: {
+      type: DataTypes.JSONB,
+      allowNull: true,
     },
   },
   {

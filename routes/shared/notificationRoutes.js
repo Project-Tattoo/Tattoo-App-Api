@@ -35,6 +35,6 @@ notificationsRouter
 notificationsRouter
   .route("/:notificationId")
   .patch(authController.protect, notificationsController.markNotificationAsRead)
-  .delete(authController.delete, notificationsController.deleteNotification);
+  .delete(authController.protect, notificationsController.deleteNotification);
 
 module.exports = notificationsRouter;
