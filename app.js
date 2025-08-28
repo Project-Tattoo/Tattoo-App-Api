@@ -8,6 +8,7 @@ require("./models/associations");
 const authRoutes = require("./routes/shared/authRoutes");
 const usersRoutes = require("./routes/shared/usersRoutes");
 const notificationsRoutes = require("./routes/shared/notificationRoutes");
+const tosRoutes = require("./routes/shared/tosRoutes")
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.set("trust proxy", true);
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", usersRoutes);
 app.use("/api/v1/notifications", notificationsRoutes);
+app.use("/api/v1/tos", tosRoutes)
 
 app.use((req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
