@@ -5,7 +5,7 @@ const catchAsync = require("./../../utils/catchAsync");
 const EmailPreferences = require("./../../models/shared/EmailPreferences");
 
 exports.getEmailPreferences = catchAsync(async (req, res, next) => {
-  const emailPreference = await EmailPReferences.findOne({
+  const emailPreference = await EmailPreferences.findOne({
     where: { userId: req.user.id },
   });
 
