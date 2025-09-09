@@ -35,3 +35,16 @@ exports.addFavoriteArtist = catchAsync(async (req, res, next) => {
 
   res.status(201).json({ status: "success", data: { usersFavoriteArtists } });
 });
+
+exports.removeFavoriteArtist = catchAsync(async (req, res, next) => {
+  await FavoriteArtists.destroy({
+    where: { userId: req.user.id, artistId: req.params.artistId },
+  });
+
+  const usersFavoriteArtists = await FavoriteArtists.findAll({
+    where: { userId: req.user.id },
+    order: [["favoritedAt", "DESC"]],
+  });
+
+  res.status(201).json({ status: "success", data: { usersFavoriteArtists } });
+});
