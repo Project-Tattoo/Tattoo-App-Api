@@ -56,6 +56,20 @@ const FavoriteArtists = db.define(
         name: "users_favorite_artists_favorited_at_idx",
       },
     ],
+    hooks: {
+      afterCreate: async(favorite, options) => {
+        await Users.increment("totalFollowers", {
+          where: {id: favorite.artistId},
+          transaction: options.transaction
+        })
+      },
+      afterDestroy: async(favorite, options) => {
+        await Users.decrement("totalFollowers", {
+          where: {id: favorite.artistId},
+          transaction: options.transaction
+        })
+      }
+    }
   }
 );
 

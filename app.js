@@ -10,6 +10,7 @@ const usersRoutes = require("./routes/shared/usersRoutes");
 const notificationsRoutes = require("./routes/shared/notificationRoutes");
 const tosRoutes = require("./routes/shared/tosRoutes")
 const emailPreferencesRouter = require("./routes/shared/emailPreferencesRoutes")
+const favoriteArtistsRouter = require("./routes/shared/favoriteArtistsRoutes")
 
 const app = express();
 
@@ -33,6 +34,7 @@ app.use("/api/v1/users", usersRoutes);
 app.use("/api/v1/notifications", notificationsRoutes);
 app.use("/api/v1/tos", tosRoutes)
 app.use("/api/v1/email-preferences", emailPreferencesRouter)
+app.use("/api/v1/favorites/artists", favoriteArtistsRouter)
 
 app.use((req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
