@@ -142,14 +142,24 @@ TattooDesigns.belongsToMany(Users, {
   as: "favoritedByUsersForDesigns",
 });
 
-Users.belongsToMany(ArtistDetails, {
+FavoriteArtists.belongsTo(Users, {
+  foreignKey: "userId",
+  as: "fan", 
+});
+
+FavoriteArtists.belongsTo(Users, {
+  foreignKey: "artistId",
+  as: "artist",
+});
+
+Users.belongsToMany(Users, {
   through: FavoriteArtists,
   foreignKey: "userId",
   otherKey: "artistId",
   as: "usersFavoritedArtists",
 });
 
-ArtistDetails.belongsToMany(Users, {
+Users.belongsToMany(Users, {
   through: FavoriteArtists,
   foreignKey: "artistId",
   otherKey: "userId",
