@@ -42,7 +42,7 @@ const FavoriteArtists = db.define(
     },
   },
   {
-    timestamps: false,
+    timestamps: true,
     indexes: [
       {
         unique: true,
@@ -57,19 +57,22 @@ const FavoriteArtists = db.define(
       },
     ],
     hooks: {
-      afterCreate: async(favorite, options) => {
+      afterCreate: async (favorite, options) => {
         await Users.increment("totalFollowers", {
-          where: {id: favorite.artistId},
-          transaction: options.transaction
-        })
+          where: { id: favorite.artistId },
+          transaction: options.transaction,
+        });
       },
-      afterDestroy: async(favorite, options) => {
+      beforeDestroy: async (favorite, options) => {
+        options.artistId = favorite.artistId;
+      },
+      afterDestroy: async (favorite, options) => {
         await Users.decrement("totalFollowers", {
-          where: {id: favorite.artistId},
-          transaction: options.transaction
-        })
-      }
-    }
+          where: { id: options.artistId },
+          transaction: options.transaction,
+        });
+      },
+    },
   }
 );
 
