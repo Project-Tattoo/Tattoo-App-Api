@@ -21,3 +21,17 @@ exports.getPublicUsersFavoriteArtists = catchAsync(async (req, res, next) => {
 
   res.status(200).json({ status: "success", data: { usersFavoriteArtists } });
 });
+
+exports.addFavoriteArtist = catchAsync(async (req, res, next) => {
+  await FavoriteArtists.create({
+    userId: req.user.id,
+    artistId: req.params.artistId,
+  });
+
+  const usersFavoriteArtists = await FavoriteArtists.findAll({
+    where: { userId: req.user.id },
+    order: [["favoritedAt", "DESC"]],
+  });
+
+  res.status(201).json({ status: "success", data: { usersFavoriteArtists } });
+});
