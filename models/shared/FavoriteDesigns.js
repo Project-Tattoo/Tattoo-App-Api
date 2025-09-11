@@ -1,6 +1,6 @@
 const { DataTypes } = require("sequelize");
 const db = require("./../../server");
-const Users = require("./../shared/Users")
+const Users = require("./../shared/Users");
 const TattooDesigns = require("./../artists/TattooDesigns");
 
 const FavoriteDesigns = db.define(
@@ -48,7 +48,7 @@ const FavoriteDesigns = db.define(
       {
         unique: true,
         fields: ["userId", "designId"],
-        name: "unique_user_design_favorite"
+        name: "unique_user_design_favorite",
       },
       {
         fields: ["userId"],
@@ -63,8 +63,24 @@ const FavoriteDesigns = db.define(
         name: "user_favorite_designs_favorited_at_idx",
       },
     ],
+    hooks: {
+      afterCreate: async (favorite, options) => {
+        await TattooDesigns.increment("totalFavorites", {
+          where: { id: favorite.designId },
+          transaction: options.transaction,
+        });
+      },
+      beforeDestroy: async (favorite, options) => {
+        options.designId = favorite.designId;
+      },
+      afterDestroy: async (favorite, options) => {
+        await TattooDesigns.decrement("totalFavorites", {
+          where: { id: options.designId },
+          transaction: options.transaction,
+        });
+      },
+    },
   }
 );
 
 module.exports = FavoriteDesigns;
-

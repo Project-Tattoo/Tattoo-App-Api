@@ -142,6 +142,16 @@ TattooDesigns.belongsToMany(Users, {
   as: "favoritedByUsersForDesigns",
 });
 
+FavoriteDesigns.belongsTo(Users, {
+  foreignKey: "userId",
+  as: "fan",
+});
+
+FavoriteDesigns.belongsTo(TattooDesigns, {
+  foreignKey: "designId",
+  as: "design",
+});
+
 FavoriteArtists.belongsTo(Users, {
   foreignKey: "userId",
   as: "fan", 
