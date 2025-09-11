@@ -9,6 +9,13 @@ const TattooDesigns = require("./../../models/artists/TattooDesigns");
 exports.getFavoriteDesigns = catchAsync(async (req, res, next) => {
   const usersFavoriteDesigns = await FavoriteDesigns.findAll({
     where: { userId: req.user.id },
+    include: [
+      {
+        model: TattooDesigns,
+        as: "design",
+        attributes: ["publicId", "title", "thumbnailUrl"],
+      },
+    ],
     order: [["favoritedAt", "DESC"]],
   });
 
@@ -39,13 +46,11 @@ exports.getPublicUsersFavoriteDesigns = catchAsync(async (req, res, next) => {
 
   const usersFavoriteDesigns = favoriteDesigns.map((fav) => fav.design);
 
-  res
-    .status(200)
-    .json({
-      status: "success",
-      results: usersFavoriteDesigns.length,
-      data: { usersFavoriteDesigns },
-    });
+  res.status(200).json({
+    status: "success",
+    results: usersFavoriteDesigns.length,
+    data: { usersFavoriteDesigns },
+  });
 });
 
 exports.addFavoriteDesign = catchAsync(async (req, res, next) => {
@@ -56,6 +61,41 @@ exports.addFavoriteDesign = catchAsync(async (req, res, next) => {
 
   const usersFavoriteDesigns = await FavoriteDesigns.findAll({
     where: { userId: req.user.id },
+    include: [
+      {
+        model: TattooDesigns,
+        as: "design",
+        attributes: ["publicId", "title", "thumbnailUrl"],
+      },
+    ],
+    order: [["favoritedAt", "DESC"]],
+  });
+
+  res.status(200).json({
+    status: "success",
+    results: usersFavoriteDesigns.length,
+    data: { usersFavoriteDesigns },
+  });
+});
+
+exports.removeFavoriteDesigns = catchAsync(async (req, res, next) => {
+  const favorite = await FavoriteDesigns.findOne({
+    where: { userId: req.user.id, designId: req.params.designId },
+  });
+
+  if (favorite) {
+    await favorite.destroy();
+  }
+
+  const usersFavoriteDesigns = await FavoriteDesigns.findAll({
+    where: { userId: req.user.id },
+    include: [
+      {
+        model: TattooDesigns,
+        as: "design",
+        attributes: ["publicId", "title", "thumbnailUrl"],
+      },
+    ],
     order: [["favoritedAt", "DESC"]],
   });
 

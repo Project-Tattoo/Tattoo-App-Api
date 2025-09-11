@@ -8,6 +8,13 @@ const Users = require("./../../models/shared/Users");
 exports.getFavoriteArtists = catchAsync(async (req, res, next) => {
   const usersFavoriteArtists = await FavoriteArtists.findAll({
     where: { userId: req.user.id },
+    include: [
+      {
+        model: Users,
+        as: "artist",
+        attributes: ["publicId", "displayName", "profilePictureUrl"],
+      },
+    ],
     order: [["favoritedAt", "DESC"]],
   });
 
