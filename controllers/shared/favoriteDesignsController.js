@@ -39,6 +39,29 @@ exports.getPublicUsersFavoriteDesigns = catchAsync(async (req, res, next) => {
 
   const usersFavoriteDesigns = favoriteDesigns.map((fav) => fav.design);
 
-  res.status(200).json({ status: "success", data: { usersFavoriteDesigns } });
+  res
+    .status(200)
+    .json({
+      status: "success",
+      results: usersFavoriteDesigns.length,
+      data: { usersFavoriteDesigns },
+    });
 });
 
+exports.addFavoriteDesign = catchAsync(async (req, res, next) => {
+  await FavoriteDesigns.create({
+    userId: req.user.id,
+    designId: req.params.designId,
+  });
+
+  const usersFavoriteDesigns = await FavoriteDesigns.findAll({
+    where: { userId: req.user.id },
+    order: [["favoritedAt", "DESC"]],
+  });
+
+  res.status(200).json({
+    status: "success",
+    results: usersFavoriteDesigns.length,
+    data: { usersFavoriteDesigns },
+  });
+});
